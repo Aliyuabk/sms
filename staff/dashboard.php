@@ -1002,7 +1002,7 @@ require_once 'includes/sidebar.php';
             </div>
             <div class="action-label">Export Class List</div>
         </a>
-        <a href="message_students.php" class="action-item">
+        <a href="message.php" class="action-item">
             <div class="action-icon action-icon-message">
                 <i class="fas fa-envelope"></i>
             </div>
