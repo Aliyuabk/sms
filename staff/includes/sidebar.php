@@ -306,7 +306,7 @@ if (!defined('BASE_URL')) {
 
     <div class="sidebar-header">
         <div class="logo-container">
-            <img src="logo.png" alt="Logo">
+            <img src="../assets/images/logo.png" alt="Logo">
         </div>
         <div class="sidebar-title">SMS Portal</div>
         <div class="sidebar-subtitle">Staff Module</div>

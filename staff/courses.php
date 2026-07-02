@@ -25,7 +25,7 @@ $stmt = $pdo->prepare("SELECT s.*, d.department_name FROM staff s LEFT JOIN depa
 $stmt->execute([$staff_id]);
 $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Fetch all courses assigned to this staff
+// Fetch all courses assigned to this staff - FIXED: removed ca.level
 $stmt2 = $pdo->prepare("
     SELECT 
         c.course_id,
@@ -33,11 +33,11 @@ $stmt2 = $pdo->prepare("
         c.course_title,
         c.credit_units,
         c.course_description,
+        c.level as course_level,
         ca.session_year,
         ca.semester,
         ca.assigned_date,
         ca.status as assignment_status,
-        ca.level,
         COUNT(DISTINCT cr.student_id) as number_of_students,
         COUNT(DISTINCT CASE WHEN cr.registration_status = 'Approved' THEN cr.student_id END) as approved_students
     FROM course_assignments ca
@@ -46,8 +46,9 @@ $stmt2 = $pdo->prepare("
         AND ca.session_year = cr.session_year 
         AND ca.semester = cr.semester
     WHERE ca.staff_id = ?
+    AND ca.status = 'Active'
     GROUP BY c.course_id, c.course_code, c.course_title, c.credit_units, c.course_description,
-             ca.session_year, ca.semester, ca.assigned_date, ca.status, ca.level
+             c.level, ca.session_year, ca.semester, ca.assigned_date, ca.status
     ORDER BY ca.session_year DESC, ca.semester DESC, c.course_code
 ");
 $stmt2->execute([$staff_id]);
@@ -191,8 +192,8 @@ require_once 'includes/sidebar.php';
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: var(--primary-soft);
-        color: var(--primary-color);
+        background: rgba(255,255,255,0.2);
+        color: var(--white);
         padding: 4px 12px;
         border-radius: 10px;
         font-size: 0.8rem;
@@ -255,7 +256,7 @@ require_once 'includes/sidebar.php';
                     <div class="course-detail-meta">
                         <div class="course-detail-meta-item">
                             <span class="label">Level</span>
-                            <span class="value">Level <?php echo htmlspecialchars($course['level'] ?? 'N/A'); ?></span>
+                            <span class="value">Level <?php echo htmlspecialchars($course['course_level'] ?? 'N/A'); ?></span>
                         </div>
                         <div class="course-detail-meta-item">
                             <span class="label">Credits</span>
