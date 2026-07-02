@@ -21,7 +21,7 @@ if (!defined('FOOTER_INCLUDED')) {
                 <?php echo date('Y'); ?> Madrasatu masjid Abdullahi Ibn Abbas tumfure. All rights reserved. V.1.0
             </div> 
             <div class="footer-version">
-                <i class="fas fa-code-branch me-1"></i> Designed by <a class="app-link" href="https://kowagurutech.ng" style="color: var(--primary-color); text-decoration: underline;" target="_blank">Kowaguru Tech LTD</a>
+                <!-- <i class="fas fa-code-branch me-1"></i> Designed by <a class="app-link" href="https://kowagurutech.ng" style="color: var(--primary-color); text-decoration: underline;" target="_blank">Kowaguru Tech LTD</a> -->
             </div>
         </div>
     </footer>
