@@ -9,7 +9,7 @@
 <footer class="app-footer">
     <div class="container text-center py-3">
         <small class="copyright"> 
-           &copy; <?php echo date('Y'); ?> KowaGuru Technology Limited . All rights reserved. V.1.0 <br>
+           &copy; <?php echo date('Y'); ?> Madarasatu Masjib Ibn Abbas . All rights reserved. V.1.0 <br>
             Designed by <a class="app-link" href="https://kowagurutech.ng" target="_blank">Kowaguru Tech LTD</a>
         </small>
        

@@ -106,7 +106,7 @@ ob_clean();
 <!DOCTYPE html>
 <html lang="en"> 
 <head>
-    <title><?php echo isset($page_title) ? $page_title . ' | ' : ''; ?>5G E-GURUSCHOOL Portal</title>
+    <title><?php echo isset($page_title) ? $page_title . ' | ' : ''; ?>Madarasatu Masjib Ibn Abbas</title>
     
     <!-- Meta -->
     <meta charset="utf-8">
@@ -114,7 +114,7 @@ ob_clean();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="5G E-GURUSCHOOL Student Portal Admin Dashboard">
     <meta name="author" content="5G E-GURUSCHOOL">    
-    <link rel="shortcut icon" href="../assets/images/logo.jpeg"> 
+    <link rel="shortcut icon" href="../assets/images/logo.png" type="image/x-icon"> 
     
     <!-- FontAwesome JS-->
     <script defer src="../assets/plugins/fontawesome/js/all.min.js"></script>
@@ -446,8 +446,8 @@ ob_clean();
             <a href="#" id="sidepanel-close" class="sidepanel-close d-xl-none">&times;</a>
             <div class="app-branding">
                 <a class="app-logo" href="dashboard.php">
-                    <img class="logo-icon me-2" src="../assets/images/logo.jpeg" alt="logo">
-                    <span class="logo-text">5G E-GURU</span>
+                    <img class="logo-icon me-2" src="../assets/images/logo.png" alt="logo">
+                    <span class="logo-text">Madarasatu Masjib Ibn Abbass</span>
                 </a>
             </div><!--//app-branding-->  
             
