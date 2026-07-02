@@ -2,9 +2,9 @@
         <div class="sidebar-header">
             <div class="logo">
                 <div class="logo-icon">
-                   <img src="../assets/images/logo.jpeg" width="50" alt="Logo">
+                   <img src="../assets/images/logo.png" width="50" alt="Logo">
                 </div>
-                <div class="logo-text">E-GURU - <span>Portal</span></div>
+                <div class="logo-text">M.M.I.A - <span></span></div>
             </div>
             <div class="close-sidebar" onclick="closeMobileSidebar()">
                 <svg viewBox="0 0 24 24">
