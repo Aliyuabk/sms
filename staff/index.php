@@ -731,7 +731,7 @@ if (isset($_SESSION['staff_id'])) {
                 <div class="logo-container">
                     <div class="logo-ring"></div>
                     <div class="login-icon">
-                        <img src="../assets/images/logo.jpeg" alt="Logo">
+                        <img src="../assets/images/logo.png" alt="Logo">
                     </div>
                 </div>
                 <h3>Welcome Back</h3>
@@ -806,10 +806,10 @@ if (isset($_SESSION['staff_id'])) {
             <div class="portal-links">
                 <p>Access other portals</p>
                 <div class="link-group">
-                    <a href="../student/index.php" class="student-link">
+                    <a href="../" class="student-link">
                         <i class="fas fa-user-graduate"></i> Student Portal
                     </a>
-                    <a href="../admin/index.php" class="admin-link">
+                    <a href="../" class="admin-link">
                         <i class="fas fa-user-shield"></i> Admin Portal
                     </a>
                 </div>
