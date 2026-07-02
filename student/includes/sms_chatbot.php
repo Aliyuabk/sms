@@ -73,7 +73,7 @@ $student_first_name = $chatbot_student ? htmlspecialchars($chatbot_student['firs
                 </svg>
             </div>
             <div class="eguru-header-info">
-                <h3>E-Guru Assistant</h3>
+                <h3>AI Assistant</h3>
                 <p><span class="eguru-status-dot"></span>Online now</p>
             </div>
             <div class="eguru-header-actions">

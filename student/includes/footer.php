@@ -4,7 +4,7 @@
         </footer>
     </main>
     <?php if(isset($_SESSION['student_id'])): ?>
-    <?php include 'sms_chatbot.html'; ?>
+    <?php include 'sms_chatbot.php'; ?>
 <?php endif; ?>
     <script>
         // Toggle Sidebar (Desktop: collapse/expand, Mobile: open/close)
