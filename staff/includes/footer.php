@@ -148,7 +148,7 @@ if (!defined('FOOTER_INCLUDED')) {
 
         // Message click handler
         document.getElementById('msgBtn')?.addEventListener('click', function() {
-            window.location.href = 'messages.php';
+            window.location.href = 'message.php';
         });
 
         console.log('Staff portal loaded successfully');
