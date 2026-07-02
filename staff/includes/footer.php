@@ -18,7 +18,7 @@ if (!defined('FOOTER_INCLUDED')) {
         <div class="footer-content">
             <div class="footer-text">
                 <i class="fas fa-copyright me-1"></i>
-                <?php echo date('Y'); ?> KowaGuru Technology Limited. All rights reserved. V.1.0
+                <?php echo date('Y'); ?> Madrasatu masjid Abdullahi Ibnu Abbas tumfure. All rights reserved. V.1.0
             </div> 
             <div class="footer-version">
                 <i class="fas fa-code-branch me-1"></i> Designed by <a class="app-link" href="https://kowagurutech.ng" style="color: var(--primary-color); text-decoration: underline;" target="_blank">Kowaguru Tech LTD</a>
