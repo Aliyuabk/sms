@@ -1,3 +1,65 @@
+<?php
+/**
+ * Madrasatu Masjid Landing Page
+ * Dynamic statistics from database
+ */
+
+// Start session and output buffering
+ob_start();
+session_start();
+
+// Error reporting (remove in production)
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Include database connection
+require_once 'config/database.php';
+
+// ============================================================
+// FETCH STATISTICS FROM DATABASE
+// ============================================================
+
+try {
+    // Get total students count
+    $studentStmt = $pdo->query("SELECT COUNT(*) as total FROM students WHERE status = 'Active'");
+    $total_students = $studentStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+
+    // Get total staff count
+    $staffStmt = $pdo->query("SELECT COUNT(*) as total FROM staff WHERE status = 'Active'");
+    $total_staff = $staffStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+
+    // Get total classes/courses count
+    $courseStmt = $pdo->query("SELECT COUNT(*) as total FROM courses");
+    $total_courses = $courseStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+
+    // Get total departments
+    $deptStmt = $pdo->query("SELECT COUNT(*) as total FROM departments");
+    $total_departments = $deptStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+
+    // Get total programs
+    $programStmt = $pdo->query("SELECT COUNT(*) as total FROM programs WHERE is_active = 1");
+    $total_programs = $programStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+
+    // Get recent activity (last 5 students)
+    $recentStmt = $pdo->query("
+        SELECT student_id, first_name, last_name, registration_date 
+        FROM students 
+        WHERE status = 'Active' 
+        ORDER BY registration_date DESC 
+        LIMIT 5
+    ");
+    $recent_students = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+} catch (PDOException $e) {
+    error_log("Landing Page Error: " . $e->getMessage());
+    $total_students = 0;
+    $total_staff = 0;
+    $total_courses = 0;
+    $total_departments = 0;
+    $total_programs = 0;
+    $recent_students = [];
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -83,6 +145,13 @@
             color: var(--gold);
             box-shadow: 0 4px 12px rgba(30, 75, 107, 0.3);
             font-family: 'Noto Kufi Arabic', sans-serif;
+            overflow: hidden;
+        }
+
+        .logo-icon img {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
         }
 
         .logo-text {
@@ -182,6 +251,12 @@
             cursor: pointer;
         }
 
+        /* ===== COUNTER ANIMATION ===== */
+        .counter {
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
         /* ===== ARABIC HERO ===== */
         .hero {
             min-height: 100vh;
@@ -261,6 +336,7 @@
             display: flex;
             gap: 2.5rem;
             margin-top: 2.5rem;
+            flex-wrap: wrap;
         }
         .stat-item .stat-number {
             font-size: 2rem;
@@ -488,6 +564,32 @@
             filter: brightness(1.05);
         }
 
+        /* ===== RECENT STUDENTS ===== */
+        .recent-students {
+            background: white;
+            border-radius: var(--radius);
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            margin-top: 3rem;
+        }
+        .recent-students h4 {
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .recent-student-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 0.9rem;
+        }
+        .recent-student-item:last-child { border-bottom: none; }
+        .recent-student-item .name { font-weight: 600; }
+        .recent-student-item .date { color: var(--text-light); font-size: 0.8rem; }
+
         /* ===== FOOTER ===== */
         .footer {
             background: #0f2a3a;
@@ -635,11 +737,10 @@
 </head>
 <body>
 
-<?php include 'preloader.php'; ?>
 <!-- HEADER -->
 <header class="header" id="header">
     <a href="#" class="logo">
-        <div class="logo-icon"><img src="logo.png" width="50"></div>
+        <div class="logo-icon"><img src="logo.png" alt="Logo"></div>
         <div>
             <div class="logo-text">Madrasatu<span> masjid</span></div>
             <span class="logo-sub">Abdullahi Ibnu Abbas</span>
@@ -697,9 +798,22 @@
                 </a>
             </div>
             <div class="hero-stats">
-                <div class="stat-item"><span class="stat-number">500+</span><span class="stat-label">Students</span></div>
-                <div class="stat-item"><span class="stat-number">45+</span><span class="stat-label">Staff</span></div>
-                <div class="stat-item"><span class="stat-number">12+</span><span class="stat-label">Classes</span></div>
+                <div class="stat-item">
+                    <span class="stat-number counter" data-target="<?php echo $total_students; ?>">0</span>
+                    <span class="stat-label">Students</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number counter" data-target="<?php echo $total_staff; ?>">0</span>
+                    <span class="stat-label">Staff</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number counter" data-target="<?php echo $total_courses; ?>">0</span>
+                    <span class="stat-label">Courses</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number counter" data-target="<?php echo $total_departments; ?>">0</span>
+                    <span class="stat-label">Departments</span>
+                </div>
             </div>
         </div>
 
@@ -749,6 +863,19 @@
             <p>Role-based access, SSL encryption, and data protection for all users.</p>
         </div>
     </div>
+    
+    <!-- Recent Students -->
+    <?php if (!empty($recent_students)): ?>
+    <div class="recent-students" style="max-width: 1400px; margin: 3rem auto 0;">
+        <h4><i class="fas fa-user-plus" style="color: var(--gold);"></i> Recently Enrolled Students</h4>
+        <?php foreach ($recent_students as $student): ?>
+        <div class="recent-student-item">
+            <span class="name"><?php echo htmlspecialchars($student['first_name'] . ' ' . $student['last_name']); ?></span>
+            <span class="date">Joined: <?php echo date('M d, Y', strtotime($student['registration_date'])); ?></span>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
 </section>
 
 <!-- PORTALS -->
@@ -776,7 +903,15 @@
             <h3>Admin</h3>
             <p class="role-desc">Oversee operations, reports &amp; settings.</p>
             <a href="login.php" class="login-btn"><i class="fas fa-sign-in-alt"></i> Admin Login</a>
-        </div> 
+        </div>
+        <div class="portal-block">
+            <div class="portal-avatar"><i class="fas fa-phone-alt"></i></div>
+            <h3>Support</h3>
+            <p class="role-desc">Get help and assistance when you need it.</p>
+            <a href="#contact" class="login-btn" style="background: var(--gold); color: #1f2a3a;">
+                <i class="fas fa-headset"></i> Contact Support
+            </a>
+        </div>
     </div>
 </section>
 
@@ -848,7 +983,7 @@
         </div>
     </div>
     <div class="footer-bottom">
-        <span>&copy; 2026 Madrasatu Masjid Abdullahi Ibnu Abbas. All rights reserved.</span>
+        <span>&copy; <?php echo date('Y'); ?> Madrasatu Masjid Abdullahi Ibnu Abbas. All rights reserved.</span>
         <div class="contact-info">
             <span><i class="fas fa-phone"></i> 09037814903</span>
             <span><i class="fas fa-phone"></i> 07036135512</span>
@@ -859,23 +994,60 @@
 
 <!-- SCRIPTS -->
 <script>
-    // header scroll
+    // ===== HEADER SCROLL =====
     window.addEventListener('scroll', function() {
         document.getElementById('header').classList.toggle('scrolled', window.scrollY > 50);
     });
 
+    // ===== MOBILE MENU =====
     function toggleMobileMenu() {
         const menu = document.getElementById('mobileMenu');
         menu.classList.toggle('active');
         document.body.style.overflow = menu.classList.contains('active') ? 'hidden' : '';
     }
 
-    // smooth anchor
+    // ===== SMOOTH ANCHOR =====
     document.querySelectorAll('a[href^="#"]').forEach(a => {
         a.addEventListener('click', function(e) {
             e.preventDefault();
             const target = document.querySelector(this.getAttribute('href'));
             if (target) target.scrollIntoView({ behavior: 'smooth' });
+        });
+    });
+
+    // ===== COUNTER ANIMATION =====
+    document.addEventListener('DOMContentLoaded', function() {
+        const counters = document.querySelectorAll('.counter');
+        
+        counters.forEach(counter => {
+            const target = parseInt(counter.getAttribute('data-target'));
+            const duration = 2000; // 2 seconds
+            const step = Math.max(1, Math.floor(target / 50));
+            let current = 0;
+            
+            const updateCounter = () => {
+                current += step;
+                if (current >= target) {
+                    counter.textContent = target.toLocaleString();
+                    return;
+                }
+                counter.textContent = current.toLocaleString();
+                requestAnimationFrame(() => {
+                    setTimeout(updateCounter, duration / 50);
+                });
+            };
+            
+            // Start counter when in viewport
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        updateCounter();
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.5 });
+            
+            observer.observe(counter);
         });
     });
 </script>
