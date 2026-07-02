@@ -13,7 +13,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // Include database connection
-require_once 'config/db.php';
+require_once 'includes/database.php';
 
 // ============================================================
 // FETCH STATISTICS FROM DATABASE
