@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>مدرسة مسجد عبد الله بن عباس · Madrasjid</title>
+    <title>مدرسة مسجد عبد الله بن عباس · Madrasatu masjid</title>
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Kufi+Arabic:wght@400;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -756,7 +756,7 @@
     <div class="section-header">
         <span class="section-tag">الدخول · Access</span>
         <h2>Choose Your <span>Portal</span></h2>
-        <p>Select your role to enter the Madrasjid digital ecosystem.</p>
+        <p>Select your role to enter the Madrasatu masjid digital ecosystem.</p>
     </div>
     <div class="portals-grid">
         <div class="portal-block">
@@ -784,7 +784,7 @@
 <section class="features" id="contact" style="background: var(--cream); padding-bottom: 4rem;">
     <div class="section-header">
         <span class="section-tag">تواصل · Contact</span>
-        <h2>Visit <span>Madrasjid</span></h2>
+        <h2>Visit <span>Madrasatu masjid</span></h2>
         <p>We are located in the heart of Tumfure, Gombe State.</p>
     </div>
     <div style="max-width: 900px; margin: 0 auto; background: white; border-radius: var(--radius); padding: 3rem; box-shadow: var(--shadow-lg); border: 1px solid rgba(212,175,55,0.15);">
