@@ -54,6 +54,8 @@ if (!defined('HEADER_INCLUDED')) {
             color: var(--text-dark);
             overflow-x: hidden;
         }
+        
+        /* ===== HEADER ===== */
         .main-header {
             position: fixed;
             top: 0;
@@ -183,6 +185,12 @@ if (!defined('HEADER_INCLUDED')) {
             color: var(--white);
             font-weight: 600;
             font-size: 0.9rem;
+            overflow: hidden;
+        }
+        .header-user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
         .header-user-info { text-align: left; }
         .header-user-name {
@@ -207,15 +215,7 @@ if (!defined('HEADER_INCLUDED')) {
             padding: 30px;
             animation: fadeInUp 0.6s ease;
         }
-        .filter-select{
-            padding: 6px 12px;
-            border: 1px solid var(--gray-300);
-            border-radius: 8px;
-            background: var(--white);
-            font-size: 0.85rem;
-            transition: var(--transition);
-            width: 150px;
-        }
+        
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -228,6 +228,7 @@ if (!defined('HEADER_INCLUDED')) {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb {
@@ -235,6 +236,7 @@ if (!defined('HEADER_INCLUDED')) {
             border-radius: 10px;
         }
         ::-webkit-scrollbar-thumb:hover { background: var(--gray-500); }
+        
         @media (max-width: 991px) {
             .main-header { margin-left: 0 !important; left: 0 !important; }
             .main-content { margin-left: 0 !important; }
@@ -244,6 +246,7 @@ if (!defined('HEADER_INCLUDED')) {
         @media (max-width: 768px) {
             .header-search { display: none; }
             .header-user-info { display: none; }
+            .content-wrapper { padding: 20px 15px; }
         }
     </style>
 </head>
@@ -296,13 +299,20 @@ if (!defined('HEADER_INCLUDED')) {
             <div class="header-user dropdown">
                 <div class="header-user-avatar" data-bs-toggle="dropdown">
                     <?php 
-                    $name = $staff['staff_name'] ?? 'User';
-                    echo strtoupper(substr($name, 0, 1)); 
+                    $name = $_SESSION['staff_name'] ?? 'User';
+                    $initial = strtoupper(substr($name, 0, 1));
+                    $profile_image = $_SESSION['staff_image'] ?? null;
+                    
+                    if (!empty($profile_image) && file_exists('../' . $profile_image)) {
+                        echo '<img src="../' . htmlspecialchars($profile_image) . '" alt="Profile">';
+                    } else {
+                        echo $initial;
+                    }
                     ?>
                 </div>
                 <div class="header-user-info d-none d-lg-block" data-bs-toggle="dropdown">
                     <div class="header-user-name"><?php echo htmlspecialchars(explode(' ', $name)[0]); ?></div>
-                    <div class="header-user-role"><?php echo htmlspecialchars($staff['role'] ?? 'Staff'); ?></div>
+                    <div class="header-user-role"><?php echo htmlspecialchars($_SESSION['staff_role'] ?? 'Staff'); ?></div>
                 </div>
                 <i class="fas fa-chevron-down d-none d-lg-block" style="font-size: 0.7rem; color: var(--gray-500);" data-bs-toggle="dropdown"></i>
 
@@ -317,4 +327,4 @@ if (!defined('HEADER_INCLUDED')) {
 
     <!-- MAIN CONTENT START -->
     <div class="main-content">
-        <div class="content-wrapper"> 
+        <div class="content-wrapper">

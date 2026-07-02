@@ -21,10 +21,60 @@ if (!defined('FOOTER_INCLUDED')) {
                 <?php echo date('Y'); ?> KowaGuru Technology Limited. All rights reserved. V.1.0
             </div> 
             <div class="footer-version">
-                <i class="fas fa-code-branch me-1"></i> Designed by <a class="app-link" href="https://kowagurutech.ng" style="color: blue; text-decoration: underline;" target="_blank">Kowaguru Tech LTD</a>
+                <i class="fas fa-code-branch me-1"></i> Designed by <a class="app-link" href="https://kowagurutech.ng" style="color: var(--primary-color); text-decoration: underline;" target="_blank">Kowaguru Tech LTD</a>
             </div>
         </div>
     </footer>
+
+    <style>
+        .main-footer {
+            margin-left: var(--sidebar-width);
+            padding: 20px 30px;
+            background: var(--white);
+            border-top: 1px solid var(--gray-200);
+            transition: var(--transition);
+            animation: fadeInUp 0.5s ease;
+        }
+        .sidebar.collapsed ~ .main-footer {
+            margin-left: var(--sidebar-collapsed);
+        }
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .footer-text {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+        .footer-version {
+            font-size: 0.8rem;
+            color: var(--gray-500);
+            background: var(--gray-100);
+            padding: 4px 12px;
+            border-radius: 8px;
+        }
+        .footer-version a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .footer-version a:hover {
+            text-decoration: underline;
+        }
+        @media (max-width: 768px) {
+            .main-footer {
+                padding: 15px 20px;
+                margin-left: 0 !important;
+            }
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -42,7 +92,8 @@ if (!defined('FOOTER_INCLUDED')) {
 
         // Mobile menu toggle
         if (mobileMenuBtn) {
-            mobileMenuBtn.addEventListener('click', () => {
+            mobileMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 sidebar.classList.toggle('show');
             });
         }
@@ -74,7 +125,8 @@ if (!defined('FOOTER_INCLUDED')) {
         };
 
         window.addEventListener('scroll', animateOnScroll);
-        animateOnScroll();
+        // Initial call
+        setTimeout(animateOnScroll, 100);
 
         // Search functionality
         const searchInput = document.getElementById('globalSearch');
@@ -88,6 +140,18 @@ if (!defined('FOOTER_INCLUDED')) {
                 }
             });
         }
+
+        // Notification click handler
+        document.getElementById('notifBtn')?.addEventListener('click', function() {
+            window.location.href = 'notifications.php';
+        });
+
+        // Message click handler
+        document.getElementById('msgBtn')?.addEventListener('click', function() {
+            window.location.href = 'messages.php';
+        });
+
+        console.log('Staff portal loaded successfully');
     </script>
 </body>
-</html> 
+</html>

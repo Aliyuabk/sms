@@ -1,4 +1,4 @@
- <?php
+<?php
 /**
  * Staff Sidebar Include
  * Include after header.php
@@ -12,10 +12,6 @@ if (!defined('SIDEBAR_INCLUDED')) {
 
 // Define BASE_URL if not already defined
 if (!defined('BASE_URL')) {
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    
-    // Detect if we're in /staff/ subdirectory
     $scriptDir = dirname($_SERVER['SCRIPT_NAME']);
     if (strpos($scriptDir, '/staff') !== false) {
         define('BASE_URL', '/staff/');
@@ -38,6 +34,8 @@ if (!defined('BASE_URL')) {
         overflow-y: auto;
         overflow-x: hidden;
         box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+        display: flex;
+        flex-direction: column;
     }
     .sidebar.collapsed {
         width: var(--sidebar-collapsed);
@@ -47,6 +45,7 @@ if (!defined('BASE_URL')) {
         text-align: center;
         border-bottom: 1px solid rgba(255,255,255,0.1);
         animation: fadeInDown 0.6s ease;
+        flex-shrink: 0;
     }
     .logo-container {
         width: 60px;
@@ -59,9 +58,16 @@ if (!defined('BASE_URL')) {
         margin-bottom: 12px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         transition: var(--transition);
+        overflow: hidden;
     }
     .logo-container:hover {
         transform: scale(1.05) rotate(5deg);
+    }
+    .logo-container img {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        border-radius: 12px;
     }
     .logo-container i {
         font-size: 28px;
@@ -84,7 +90,11 @@ if (!defined('BASE_URL')) {
         opacity: 0;
         transform: translateX(-20px);
     }
-    .nav-menu { padding: 15px 0; }
+    .nav-menu { 
+        padding: 15px 0;
+        flex: 1;
+        overflow-y: auto;
+    }
     .nav-section {
         padding: 0 20px;
         margin-bottom: 8px;
@@ -196,13 +206,10 @@ if (!defined('BASE_URL')) {
         font-size: 0.6rem;
     }
     .sidebar-footer {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
         padding: 20px;
         border-top: 1px solid rgba(255,255,255,0.1);
         background: rgba(0,0,0,0.1);
+        flex-shrink: 0;
     }
     .user-mini {
         display: flex;
@@ -221,6 +228,12 @@ if (!defined('BASE_URL')) {
         color: var(--primary-dark);
         font-size: 0.9rem;
         flex-shrink: 0;
+        overflow: hidden;
+    }
+    .user-mini-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
     }
     .user-mini-info {
         overflow: hidden;
@@ -265,6 +278,7 @@ if (!defined('BASE_URL')) {
     .sidebar.collapsed .sidebar-toggle {
         transform: rotate(180deg);
     }
+    
     @keyframes fadeInDown {
         from { opacity: 0; transform: translateY(-20px); }
         to { opacity: 1; transform: translateY(0); }
@@ -273,6 +287,7 @@ if (!defined('BASE_URL')) {
         from { opacity: 0; transform: translateX(-20px); }
         to { opacity: 1; transform: translateX(0); }
     }
+    
     @media (max-width: 991px) {
         .sidebar {
             transform: translateX(-100%);
@@ -291,7 +306,7 @@ if (!defined('BASE_URL')) {
 
     <div class="sidebar-header">
         <div class="logo-container">
-            <i class="fas fa-graduation-cap"></i>
+            <img src="../assets/images/logo.jpeg" alt="Logo">
         </div>
         <div class="sidebar-title">SMS Portal</div>
         <div class="sidebar-subtitle">Staff Module</div>
@@ -322,6 +337,20 @@ if (!defined('BASE_URL')) {
             </a>
         </div>
 
+        <div class="nav-item">
+            <a class="nav-link <?php echo ($active_page ?? '') === 'attendance' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>attendance.php">
+                <span class="nav-icon"><i class="fas fa-clipboard-check"></i></span>
+                <span class="nav-text">Attendance</span>
+            </a>
+        </div>
+
+        <div class="nav-item">
+            <a class="nav-link <?php echo ($active_page ?? '') === 'results' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>results.php">
+                <span class="nav-icon"><i class="fas fa-graduation-cap"></i></span>
+                <span class="nav-text">Results</span>
+            </a>
+        </div>
+
         <div class="nav-section">Account</div>
 
         <div class="nav-item">
@@ -332,10 +361,39 @@ if (!defined('BASE_URL')) {
         </div>
 
         <div class="nav-item">
+            <a class="nav-link <?php echo ($active_page ?? '') === 'settings' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>settings.php">
+                <span class="nav-icon"><i class="fas fa-cog"></i></span>
+                <span class="nav-text">Settings</span>
+            </a>
+        </div>
+
+        <div class="nav-item">
             <a class="nav-link" href="<?php echo BASE_URL; ?>logout.php">
                 <span class="nav-icon"><i class="fas fa-sign-out-alt"></i></span>
                 <span class="nav-text">Logout</span>
             </a>
         </div>
     </nav>
-</aside> 
+
+    <div class="sidebar-footer">
+        <div class="user-mini">
+            <div class="user-mini-avatar">
+                <?php 
+                $name = $_SESSION['staff_name'] ?? 'User';
+                $initial = strtoupper(substr($name, 0, 1));
+                $profile_image = $_SESSION['staff_image'] ?? null;
+                
+                if (!empty($profile_image) && file_exists('../' . $profile_image)) {
+                    echo '<img src="../' . htmlspecialchars($profile_image) . '" alt="Profile">';
+                } else {
+                    echo $initial;
+                }
+                ?>
+            </div>
+            <div class="user-mini-info">
+                <div class="user-mini-name"><?php echo htmlspecialchars($name); ?></div>
+                <div class="user-mini-role"><?php echo htmlspecialchars($_SESSION['staff_role'] ?? 'Staff'); ?></div>
+            </div>
+        </div>
+    </div>
+</aside>

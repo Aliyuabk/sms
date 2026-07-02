@@ -1,80 +1,116 @@
 <?php
-session_start();
-require_once 'config/database.php';
+/**
+ * Staff Dashboard
+ * Main landing page after login
+ */
 
-// Auth check
+// ============================================================
+// START SESSION & OUTPUT BUFFERING
+// ============================================================
+ob_start();
+session_start();
+
+// ============================================================
+// ERROR REPORTING (Remove in production)
+// ============================================================
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// ============================================================
+// AUTH CHECK
+// ============================================================
 if (!isset($_SESSION['staff_id'])) {
+    ob_end_clean();
     header('Location: index.php');
     exit;
 }
+
+require_once 'config/database.php';
 
 $staff_id = $_SESSION['staff_id'];
 
-// Fetch staff data from the actual staff table
-$stmt = $pdo->prepare("
-    SELECT 
-        s.*,
-        d.department_name,
-        r.role_name as role_name
-    FROM staff s
-    LEFT JOIN departments d ON s.department_id = d.department_id
-    LEFT JOIN staff_roles r ON s.staff_role_id = r.role_id
-    WHERE s.staff_id = ?
-");
-$stmt->execute([$staff_id]);
-$staff = $stmt->fetch(PDO::FETCH_ASSOC);
+// ============================================================
+// FETCH STAFF DATA
+// ============================================================
+try {
+    // Fetch staff details
+    $stmt = $pdo->prepare("
+        SELECT 
+            s.*,
+            d.department_name,
+            r.role_name
+        FROM staff s
+        LEFT JOIN departments d ON s.department_id = d.department_id
+        LEFT JOIN staff_roles r ON s.staff_role_id = r.role_id
+        WHERE s.staff_id = ?
+    ");
+    $stmt->execute([$staff_id]);
+    $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// If staff not found, logout
-if (!$staff) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
+    if (!$staff) {
+        session_destroy();
+        ob_end_clean();
+        header('Location: index.php?error=account_not_found');
+        exit;
+    }
+
+    // Set staff name for display
+    $staff['staff_name'] = $staff['first_name'] . ' ' . $staff['last_name'];
+    $_SESSION['staff_name'] = $staff['staff_name'];
+
+    // Fetch courses taught by this staff
+    $stmt2 = $pdo->prepare("
+        SELECT 
+            c.course_id,
+            c.course_code,
+            c.course_title,
+            c.credit_units,
+            ca.session_year,
+            ca.semester,
+            ca.assigned_date,
+            ca.status as assignment_status,
+            ca.level,
+            COUNT(DISTINCT cr.student_id) as number_of_students
+        FROM course_assignments ca
+        JOIN courses c ON ca.course_id = c.course_id
+        LEFT JOIN course_registrations cr ON ca.course_id = cr.course_id 
+            AND ca.session_year = cr.session_year 
+            AND ca.semester = cr.semester
+            AND cr.registration_status = 'Approved'
+        WHERE ca.staff_id = ?
+        AND ca.status = 'Active'
+        GROUP BY c.course_id, c.course_code, c.course_title, c.credit_units, 
+                 ca.session_year, ca.semester, ca.assigned_date, ca.status, ca.level
+        ORDER BY ca.session_year DESC, ca.semester DESC
+    ");
+    $stmt2->execute([$staff_id]);
+    $courses = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+    // Calculate totals
+    $total_courses = count($courses);
+    $total_students = 0;
+    foreach ($courses as $course) {
+        $total_students += $course['number_of_students'];
+    }
+    $staff['total_courses'] = $total_courses;
+    $staff['total_students'] = $total_students;
+
+    // Get current session
+    $current_session = $pdo->query("
+        SELECT session_year, semester, session_name 
+        FROM academic_sessions 
+        WHERE is_current = 1 
+        LIMIT 1
+    ")->fetch(PDO::FETCH_ASSOC);
+
+} catch (PDOException $e) {
+    error_log("Dashboard Error: " . $e->getMessage());
+    $error = "Unable to load dashboard data. Please try again later.";
 }
 
-// Alias staff_name for header display
-$staff['staff_name'] = $staff['first_name'] . ' ' . $staff['last_name'];
-
-// Fetch courses taught by this staff member
-$stmt2 = $pdo->prepare("
-    SELECT 
-        c.course_id,
-        c.course_code,
-        c.course_title,
-        c.credit_units,
-        ca.session_year,
-        ca.semester,
-        ca.assigned_date,
-        ca.status as assignment_status,
-        COALESCE(cr.student_count, 0) as number_of_students,
-        ca.level
-    FROM course_assignments ca
-    JOIN courses c ON ca.course_id = c.course_id
-    LEFT JOIN (
-        SELECT course_id, session_year, semester, COUNT(*) as student_count
-        FROM course_registrations
-        GROUP BY course_id, session_year, semester
-    ) cr ON ca.course_id = cr.course_id AND ca.session_year = cr.session_year AND ca.semester = cr.semester
-    WHERE ca.staff_id = ?
-    AND ca.status = 'Active'
-    ORDER BY ca.session_year DESC, ca.semester DESC
-");
-$stmt2->execute([$staff_id]);
-$courses = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-
-// Get current session
-$current_session = $pdo->query("SELECT session_year, semester FROM academic_sessions WHERE is_current = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-
-// Calculate total students from courses
-$total_students = 0;
-foreach ($courses as $course) {
-    $total_students += $course['number_of_students'];
-}
-
-// Add data to staff array for display
-$staff['total_courses'] = count($courses);
-$staff['total_students'] = $total_students;
-
-// Page variables for header
+// ============================================================
+// PAGE VARIABLES
+// ============================================================
 $page_title = 'Dashboard';
 $page_icon = 'fas fa-home';
 $active_page = 'dashboard';
@@ -83,12 +119,13 @@ $breadcrumbs = [
     ['title' => 'Dashboard']
 ];
 
-// Include header
+// ============================================================
+// INCLUDE HEADER & SIDEBAR
+// ============================================================
 require_once 'includes/header.php';
-
-// Include sidebar
 require_once 'includes/sidebar.php';
 ?>
+
 <style>
     /* ===== PROFILE HERO ===== */
     .profile-hero {
@@ -127,6 +164,7 @@ require_once 'includes/sidebar.php';
         display: flex;
         align-items: center;
         gap: 30px;
+        flex-wrap: wrap;
     }
     .profile-avatar {
         width: 100px;
@@ -152,7 +190,7 @@ require_once 'includes/sidebar.php';
         font-size: 2.5rem;
         color: var(--primary-color);
     }
-    .profile-info { flex: 1; }
+    .profile-info { flex: 1; min-width: 200px; }
     .profile-name {
         font-size: 1.8rem;
         font-weight: 800;
@@ -207,6 +245,7 @@ require_once 'includes/sidebar.php';
         text-align: right;
         position: relative;
         z-index: 1;
+        min-width: 150px;
     }
     .session-label {
         font-size: 0.8rem;
@@ -237,6 +276,7 @@ require_once 'includes/sidebar.php';
         position: relative;
         overflow: hidden;
         animation: fadeInUp 0.6s ease backwards;
+        height: 100%;
     }
     .stat-card:nth-child(1) { animation-delay: 0.1s; }
     .stat-card:nth-child(2) { animation-delay: 0.2s; }
@@ -331,6 +371,8 @@ require_once 'includes/sidebar.php';
         align-items: center;
         margin-bottom: 25px;
         animation: fadeInUp 0.5s ease;
+        flex-wrap: wrap;
+        gap: 15px;
     }
     .section-title {
         font-size: 1.3rem;
@@ -383,10 +425,14 @@ require_once 'includes/sidebar.php';
         overflow: hidden;
         animation: fadeInUp 0.6s ease backwards;
         border: 1px solid transparent;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
     }
     .course-card:nth-child(1) { animation-delay: 0.1s; }
     .course-card:nth-child(2) { animation-delay: 0.2s; }
     .course-card:nth-child(3) { animation-delay: 0.3s; }
+    .course-card:nth-child(4) { animation-delay: 0.4s; }
     .course-card:hover {
         transform: translateY(-8px);
         box-shadow: var(--shadow-lg);
@@ -397,6 +443,8 @@ require_once 'includes/sidebar.php';
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 10px;
     }
     .course-code {
         background: var(--primary-soft);
@@ -427,7 +475,10 @@ require_once 'includes/sidebar.php';
         background: currentColor;
         animation: pulse 2s infinite;
     }
-    .course-body { padding: 20px; }
+    .course-body { 
+        padding: 20px;
+        flex: 1;
+    }
     .course-title {
         font-size: 1.1rem;
         font-weight: 700;
@@ -438,6 +489,7 @@ require_once 'includes/sidebar.php';
     .course-meta {
         display: flex;
         gap: 15px;
+        flex-wrap: wrap;
         margin-bottom: 20px;
     }
     .course-meta-item {
@@ -478,26 +530,11 @@ require_once 'includes/sidebar.php';
         color: var(--primary-color);
         font-size: 0.95rem;
     }
-    .progress-wrap { margin-bottom: 20px; }
-    .progress-label {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.8rem;
-        margin-bottom: 8px;
-        color: var(--text-light);
+    .course-actions { 
+        display: flex; 
+        gap: 10px;
+        margin-top: auto;
     }
-    .progress {
-        height: 8px;
-        background: var(--gray-200);
-        border-radius: 10px;
-        overflow: hidden;
-    }
-    .progress-bar {
-        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-        border-radius: 10px;
-        transition: width 1s ease;
-    }
-    .course-actions { display: flex; gap: 10px; }
     .btn-course {
         flex: 1;
         padding: 12px;
@@ -541,6 +578,7 @@ require_once 'includes/sidebar.php';
         display: flex;
         align-items: center;
         gap: 8px;
+        border-radius: 0 0 20px 20px;
     }
     .course-footer i { color: var(--primary-light); }
 
@@ -583,6 +621,7 @@ require_once 'includes/sidebar.php';
         padding: 30px;
         box-shadow: var(--shadow-sm);
         animation: fadeInUp 0.7s ease;
+        margin-top: 30px;
     }
     .quick-actions-title {
         font-size: 1.1rem;
@@ -595,7 +634,7 @@ require_once 'includes/sidebar.php';
     .quick-actions-title i { color: var(--warning-color); }
     .action-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 15px;
     }
     .action-item {
@@ -649,45 +688,7 @@ require_once 'includes/sidebar.php';
         font-weight: 600;
     }
 
-    /* ===== FOOTER ===== */
-    .main-footer {
-        margin-left: var(--sidebar-width);
-        padding: 20px 30px;
-        background: var(--white);
-        border-top: 1px solid var(--gray-200);
-        transition: var(--transition);
-        animation: fadeInUp 0.5s ease;
-    }
-    .sidebar.collapsed ~ .main-footer {
-        margin-left: var(--sidebar-collapsed);
-    }
-    .footer-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .footer-text {
-        font-size: 0.85rem;
-        color: var(--text-light);
-    }
-    .footer-links { display: flex; gap: 20px; }
-    .footer-links a {
-        color: var(--text-light);
-        text-decoration: none;
-        font-size: 0.85rem;
-        transition: var(--transition);
-    }
-    .footer-links a:hover { color: var(--primary-color); }
-    .footer-version {
-        font-size: 0.8rem;
-        color: var(--gray-500);
-        background: var(--gray-100);
-        padding: 4px 12px;
-        border-radius: 8px;
-    }
-
+    /* ===== ANIMATIONS ===== */
     @keyframes float {
         0%, 100% { transform: translateY(0); }
         50% { transform: translateY(-10px); }
@@ -697,22 +698,43 @@ require_once 'includes/sidebar.php';
         50% { opacity: 0.5; }
     }
 
-    @media (max-width: 1200px) {
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .profile-hero { padding: 25px; }
+        .profile-hero-content { flex-direction: column; text-align: center; }
+        .profile-session { text-align: center; margin-top: 20px; width: 100%; }
+        .profile-meta { justify-content: center; }
+        .profile-badges { justify-content: center; }
+        .stat-value { font-size: 1.5rem; }
         .action-grid { grid-template-columns: repeat(2, 1fr); }
     }
-    @media (max-width: 768px) {
-        .profile-hero-content { flex-direction: column; text-align: center; }
-        .profile-session { text-align: center; margin-top: 20px; }
+    @media (max-width: 480px) {
         .action-grid { grid-template-columns: 1fr; }
+        .course-actions { flex-direction: column; }
     }
 </style>
+
+<!-- ============================================================ -->
+<!-- DASHBOARD CONTENT -->
+<!-- ============================================================ -->
+
+<?php if (isset($error)): ?>
+    <div class="alert alert-danger alert-dismissible fade show">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <?php echo htmlspecialchars($error); ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
 
 <!-- Profile Hero -->
 <div class="profile-hero">
     <div class="profile-hero-content">
         <div class="profile-avatar">
-            <?php if (!empty($staff['profile_image'])): ?>
-                <img src="<?php echo htmlspecialchars($staff['profile_image']); ?>" alt="Profile">
+            <?php 
+            $profile_image = $staff['profile_image'] ?? null;
+            if (!empty($profile_image) && file_exists('../' . $profile_image)): 
+            ?>
+                <img src="../<?php echo htmlspecialchars($profile_image); ?>" alt="Profile">
             <?php else: ?>
                 <i class="fas fa-user-tie"></i>
             <?php endif; ?>
@@ -780,7 +802,7 @@ require_once 'includes/sidebar.php';
                     <i class="fas fa-arrow-up me-1"></i>Active
                 </span>
             </div>
-            <div class="stat-value"><?php echo $staff['total_courses'] ?? 0; ?></div>
+            <div class="stat-value"><?php echo $total_courses; ?></div>
             <div class="stat-label">Active Courses</div>
             <div class="stat-footer">
                 <i class="fas fa-layer-group me-1"></i>
@@ -796,10 +818,10 @@ require_once 'includes/sidebar.php';
                     <i class="fas fa-user-graduate"></i>
                 </div>
                 <span class="stat-trend trend-up">
-                    <i class="fas fa-arrow-up me-1"></i>+12%
+                    <i class="fas fa-arrow-up me-1"></i>Total
                 </span>
             </div>
-            <div class="stat-value"><?php echo $staff['total_students'] ?? 0; ?></div>
+            <div class="stat-value"><?php echo $total_students; ?></div>
             <div class="stat-label">Total Students</div>
             <div class="stat-footer">
                 <i class="fas fa-users me-1"></i>
@@ -865,12 +887,12 @@ require_once 'includes/sidebar.php';
     <?php if (count($courses) > 0): ?>
         <?php foreach ($courses as $course): ?>
         <div class="col-md-6 col-lg-4 course-item">
-            <div class="course-card h-100">
+            <div class="course-card">
                 <div class="course-header">
                     <span class="course-code"><?php echo htmlspecialchars($course['course_code']); ?></span>
                     <span class="course-status status-active">
                         <span class="status-dot"></span>
-                        <?php echo htmlspecialchars($course['assignment_status']); ?>
+                        <?php echo htmlspecialchars($course['assignment_status'] ?? 'Active'); ?>
                     </span>
                 </div>
 
@@ -880,19 +902,24 @@ require_once 'includes/sidebar.php';
                     <div class="course-meta">
                         <div class="course-meta-item">
                             <i class="fas fa-layer-group"></i>
-                            Level <?php echo htmlspecialchars($course['level']); ?>
+                            Level <?php echo htmlspecialchars($course['level'] ?? 'N/A'); ?>
                         </div>
                         <div class="course-meta-item">
                             <i class="fas fa-star"></i>
-                            <?php echo htmlspecialchars($course['credit_units']); ?> Units
+                            <?php echo htmlspecialchars($course['credit_units'] ?? 0); ?> Units
+                        </div>
+                        <div class="course-meta-item">
+                            <i class="fas fa-calendar"></i>
+                            Sem <?php echo htmlspecialchars($course['semester'] ?? 1); ?>
                         </div>
                     </div>
 
                     <div class="student-stack">
                         <div class="student-avatar-stack">
                             <?php 
-                            $student_count = $course['number_of_students'];
-                            for ($i = 0; $i < min(4, $student_count); $i++): 
+                            $student_count = $course['number_of_students'] ?? 0;
+                            $display_count = min(4, $student_count);
+                            for ($i = 0; $i < $display_count; $i++): 
                             ?>
                             <div class="student-mini-avatar"><?php echo chr(65 + $i); ?></div>
                             <?php endfor; ?>
@@ -901,16 +928,6 @@ require_once 'includes/sidebar.php';
                             <?php endif; ?>
                         </div>
                         <span class="student-count"><?php echo $student_count; ?> Students</span>
-                    </div>
-
-                    <div class="progress-wrap">
-                        <div class="progress-label">
-                            <span>Class Capacity</span>
-                            <span><?php echo min(100, $student_count * 5); ?>%</span>
-                        </div>
-                        <div class="progress">
-                            <div class="progress-bar" style="width: 0%" data-width="<?php echo min(100, $student_count * 5); ?>"></div>
-                        </div>
                     </div>
 
                     <div class="course-actions">
@@ -944,7 +961,7 @@ require_once 'includes/sidebar.php';
 </div>
 
 <!-- Quick Actions -->
-<div class="quick-actions mt-4">
+<div class="quick-actions">
     <div class="quick-actions-title">
         <i class="fas fa-bolt"></i>
         Quick Actions
@@ -962,12 +979,18 @@ require_once 'includes/sidebar.php';
             </div>
             <div class="action-label">Export Class List</div>
         </a>
-        <a href="message_student.php" class="action-item">
+        <a href="message_students.php" class="action-item">
             <div class="action-icon action-icon-message">
                 <i class="fas fa-envelope"></i>
             </div>
             <div class="action-label">Message Students</div>
-        </a> 
+        </a>
+        <a href="analytics.php" class="action-item">
+            <div class="action-icon action-icon-analytics">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="action-label">Analytics</div>
+        </a>
     </div>
 </div>
 
@@ -993,12 +1016,17 @@ require_once 'includes/sidebar.php';
         }
     }
 
-    // Animate progress bars on load
-    window.addEventListener('load', () => {
-        document.querySelectorAll('.progress-bar[data-width]').forEach(bar => {
+    // Auto-animate on load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animate stat cards
+        document.querySelectorAll('.stat-card').forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
             setTimeout(() => {
-                bar.style.width = bar.getAttribute('data-width') + '%';
-            }, 500);
+                card.style.transition = 'all 0.6s ease';
+                card.style.opacity = '1';
+                card.style.transform = 'translateY(0)';
+            }, 200 + (index * 100));
         });
     });
 </script>
@@ -1006,4 +1034,5 @@ require_once 'includes/sidebar.php';
 <?php
 // Include footer
 require_once 'includes/footer.php';
+ob_end_flush();
 ?>
