@@ -91,10 +91,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
     
     if (empty($errors)) {
         try {
-            $pdo->beginTransaction();
+            // Check if we have recipients to send to
+            $has_recipients = false;
             
             if ($recipient_type === 'all_students') {
-                // Send to all students in a course
                 $recipient_course = $_POST['course_id'] ?? 0;
                 if ($recipient_course > 0) {
                     $allStmt = $pdo->prepare("
@@ -106,40 +106,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
                     $allStmt->execute([$recipient_course]);
                     $all_students = $allStmt->fetchAll(PDO::FETCH_ASSOC);
                     
-                    foreach ($all_students as $stu) {
-                        $insertStmt = $pdo->prepare("
-                            INSERT INTO notifications (student_id, title, message, notification_type, priority, sent_date)
-                            VALUES (?, ?, ?, ?, ?, NOW())
-                        ");
-                        $insertStmt->execute([$stu['student_id'], $subject, $message, $type, $priority]);
-                        $success_count++;
+                    if (!empty($all_students)) {
+                        $has_recipients = true;
+                        // Start transaction only if we have recipients
+                        $pdo->beginTransaction();
+                        
+                        foreach ($all_students as $stu) {
+                            $insertStmt = $pdo->prepare("
+                                INSERT INTO notifications (student_id, title, message, notification_type, priority, sent_date)
+                                VALUES (?, ?, ?, ?, ?, NOW())
+                            ");
+                            $insertStmt->execute([$stu['student_id'], $subject, $message, $type, $priority]);
+                            $success_count++;
+                        }
+                        
+                        $pdo->commit();
                     }
                 }
             } elseif ($recipient_type === 'student' && $recipient_id > 0) {
-                // Send to individual student
-                $insertStmt = $pdo->prepare("
-                    INSERT INTO notifications (student_id, title, message, notification_type, priority, sent_date)
-                    VALUES (?, ?, ?, ?, ?, NOW())
-                ");
-                $insertStmt->execute([$recipient_id, $subject, $message, $type, $priority]);
-                $success_count++;
+                // Verify student exists
+                $checkStmt = $pdo->prepare("SELECT student_id FROM students WHERE student_id = ?");
+                $checkStmt->execute([$recipient_id]);
+                if ($checkStmt->fetch()) {
+                    $has_recipients = true;
+                    $pdo->beginTransaction();
+                    
+                    $insertStmt = $pdo->prepare("
+                        INSERT INTO notifications (student_id, title, message, notification_type, priority, sent_date)
+                        VALUES (?, ?, ?, ?, ?, NOW())
+                    ");
+                    $insertStmt->execute([$recipient_id, $subject, $message, $type, $priority]);
+                    $success_count++;
+                    
+                    $pdo->commit();
+                }
             }
             
-            $pdo->commit();
-            
-            // Log the message
-            $logStmt = $pdo->prepare("
-                INSERT INTO admin_logs (admin_id, action, description, created_at)
-                VALUES (?, 'Send Message', ?, NOW())
-            ");
-            $logStmt->execute([$staff_id, "Sent message to $success_count recipient(s): $subject"]);
-            
-            $_SESSION['message_success'] = "Message sent to $success_count recipient(s) successfully!";
-            header('Location: message.php');
-            exit;
+            if (!$has_recipients) {
+                $errors[] = "No valid recipients found. Please select a student or course.";
+            } else {
+                // Log the message
+                try {
+                    $logStmt = $pdo->prepare("
+                        INSERT INTO admin_logs (admin_id, action, description, created_at)
+                        VALUES (?, 'Send Message', ?, NOW())
+                    ");
+                    $logStmt->execute([$staff_id, "Sent message to $success_count recipient(s): $subject"]);
+                } catch (Exception $e) {
+                    // Ignore logging errors
+                }
+                
+                $_SESSION['message_success'] = "Message sent to $success_count recipient(s) successfully!";
+                header('Location: message.php');
+                exit;
+            }
             
         } catch (Exception $e) {
-            $pdo->rollBack();
+            // Only rollback if a transaction is active
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             $errors[] = "Error sending message: " . $e->getMessage();
             error_log("Message Error: " . $e->getMessage());
         }
