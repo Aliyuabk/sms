@@ -663,7 +663,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
                 <!-- Help text with icon -->
                 <p class="help-text">
                     <i class="fas fa-question-circle"></i>
-                    Can't find your School ID? <a href="contact.php">Contact US</a>
+                    Can't find your School ID? <a href="#">Contact US</a>
                 </p>
 
                
