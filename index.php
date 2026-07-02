@@ -736,7 +736,7 @@ try {
     </style>
 </head>
 <body>
-
+<?php include 'preloader.php';?>
 <!-- HEADER -->
 <header class="header" id="header">
     <a href="#" class="logo">
