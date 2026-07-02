@@ -641,7 +641,7 @@
     <a href="#" class="logo">
         <div class="logo-icon"><img src="logo.png" width="50"></div>
         <div>
-            <div class="logo-text">Madras<span>jid</span></div>
+            <div class="logo-text">Madrasatu<span> masjid</span></div>
             <span class="logo-sub">Abdullahi Ibnu Abbas</span>
         </div>
     </a>

@@ -1,89 +1,168 @@
 <?php
-session_start();
-require_once 'config/database.php';
+/**
+ * Student Profile Page
+ * View detailed student information
+ */
 
-// Auth check
+ob_start();
+session_start();
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 if (!isset($_SESSION['staff_id'])) {
+    ob_end_clean();
     header('Location: index.php');
     exit;
 }
 
+require_once 'config/database.php';
+
 $staff_id = $_SESSION['staff_id'];
-$student_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$student_id = $_GET['id'] ?? 0;
 
 if (!$student_id) {
     header('Location: students.php');
     exit;
 }
 
-// Verify student is in staff's course
-$verify = $pdo->prepare("
-    SELECT 1 FROM course_registrations cr
-    JOIN course_assignments ca ON cr.course_id = ca.course_id AND cr.session_year = ca.session_year AND cr.semester = ca.semester
-    WHERE cr.student_id = ? AND ca.staff_id = ? AND ca.status = 'Active' AND cr.registration_status = 'Approved'
-    LIMIT 1
+// Get staff info
+$stmt = $pdo->prepare("SELECT * FROM staff WHERE staff_id = ?");
+$stmt->execute([$staff_id]);
+$staff = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Verify staff has access to this student (teaches at least one course the student is enrolled in)
+$checkStmt = $pdo->prepare("
+    SELECT COUNT(*) as count
+    FROM course_assignments ca
+    JOIN course_registrations cr ON ca.course_id = cr.course_id
+    WHERE ca.staff_id = ? 
+    AND cr.student_id = ?
+    AND cr.registration_status = 'Approved'
+    AND ca.status = 'Active'
 ");
-$verify->execute([$student_id, $staff_id]);
-if (!$verify->fetch()) {
-    header('Location: students.php');
+$checkStmt->execute([$staff_id, $student_id]);
+$access = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+if ($access['count'] == 0) {
+    header('Location: students.php?error=unauthorized');
     exit;
 }
 
-// Fetch student details
-$stmt = $pdo->prepare("
-    SELECT s.*, d.department_name, p.program_name, p.program_code,
-           n.full_name as kin_name, n.relationship as kin_relationship, n.phone as kin_phone, n.email as kin_email,
-           m.blood_group, m.genotype, m.allergies, m.conditions, m.disability, m.emergency_contact, m.emergency_name
+// Get student details with relationships
+$studentStmt = $pdo->prepare("
+    SELECT 
+        s.*,
+        d.department_name,
+        p.program_name,
+        p.program_code,
+        f.faculty_name
     FROM students s
     LEFT JOIN departments d ON s.department_id = d.department_id
     LEFT JOIN programs p ON s.program_id = p.program_id
-    LEFT JOIN next_of_kin n ON s.student_id = n.student_id
-    LEFT JOIN medical_records m ON s.student_id = m.student_id
+    LEFT JOIN faculties f ON d.faculty_id = f.faculty_id
     WHERE s.student_id = ?
 ");
-$stmt->execute([$student_id]);
-$student = $stmt->fetch(PDO::FETCH_ASSOC);
+$studentStmt->execute([$student_id]);
+$student = $studentStmt->fetch(PDO::FETCH_ASSOC);
 
-// Fetch student's courses with this staff
-$stmt2 = $pdo->prepare("
-    SELECT c.course_id, c.course_code, c.course_title, c.credit_units, c.level,
-           ca.session_year, ca.semester,
-           r.ca_score, r.exam_score, r.total_score, r.grade, r.grade_points
+if (!$student) {
+    header('Location: students.php?error=not_found');
+    exit;
+}
+
+// Get academic records
+$academicStmt = $pdo->prepare("
+    SELECT * FROM academic_records 
+    WHERE student_id = ? 
+    ORDER BY session_year DESC, semester DESC
+");
+$academicStmt->execute([$student_id]);
+$academic_records = $academicStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get courses the student is enrolled in (taught by this staff)
+$courseStmt = $pdo->prepare("
+    SELECT 
+        c.course_id,
+        c.course_code,
+        c.course_title,
+        c.credit_units,
+        cr.session_year,
+        cr.semester,
+        cr.registration_date,
+        cr.registration_status,
+        cr.grade,
+        cr.score,
+        cr.grade_points,
+        cr.attendance_percentage
     FROM course_registrations cr
     JOIN courses c ON cr.course_id = c.course_id
-    JOIN course_assignments ca ON c.course_id = ca.course_id AND cr.session_year = ca.session_year AND cr.semester = ca.semester
-    LEFT JOIN results r ON cr.student_id = r.student_id AND c.course_id = r.course_id AND r.session_year = ca.session_year AND r.semester = ca.semester
-    WHERE cr.student_id = ? AND ca.staff_id = ? AND cr.registration_status = 'Approved'
-    ORDER BY ca.session_year DESC, ca.semester DESC
+    JOIN course_assignments ca ON c.course_id = ca.course_id
+    WHERE cr.student_id = ?
+    AND ca.staff_id = ?
+    AND cr.registration_status = 'Approved'
+    ORDER BY cr.session_year DESC, cr.semester DESC
 ");
-$stmt2->execute([$student_id, $staff_id]);
-$courses = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+$courseStmt->execute([$student_id, $staff_id]);
+$courses = $courseStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch attendance summary
-$stmt3 = $pdo->prepare("
-    SELECT status, COUNT(*) as count
-    FROM attendance
-    WHERE student_id = ? AND course_id IN (
-        SELECT course_id FROM course_assignments WHERE staff_id = ?
-    )
-    GROUP BY status
+// Get attendance records
+$attendanceStmt = $pdo->prepare("
+    SELECT 
+        a.*,
+        c.course_code,
+        c.course_title
+    FROM attendance a
+    JOIN courses c ON a.course_id = c.course_id
+    WHERE a.student_id = ?
+    ORDER BY a.class_date DESC
+    LIMIT 20
 ");
-$stmt3->execute([$student_id, $staff_id]);
-$attendance_summary = $stmt3->fetchAll(PDO::FETCH_KEY_PAIR);
+$attendanceStmt->execute([$student_id]);
+$attendance_records = $attendanceStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get staff data
-$stmt4 = $pdo->prepare("SELECT * FROM staff_dashboard WHERE staff_id = ?");
-$stmt4->execute([$staff_id]);
-$staff = $stmt4->fetch(PDO::FETCH_ASSOC);
+// Get payment records
+$paymentStmt = $pdo->prepare("
+    SELECT * FROM payments 
+    WHERE student_id = ? 
+    ORDER BY payment_date DESC
+    LIMIT 10
+");
+$paymentStmt->execute([$student_id]);
+$payments = $paymentStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Page variables
+// Get next of kin
+$kinStmt = $pdo->prepare("SELECT * FROM next_of_kin WHERE student_id = ?");
+$kinStmt->execute([$student_id]);
+$next_of_kin = $kinStmt->fetch(PDO::FETCH_ASSOC);
+
+// Get medical records
+$medicalStmt = $pdo->prepare("SELECT * FROM medical_records WHERE student_id = ?");
+$medicalStmt->execute([$student_id]);
+$medical = $medicalStmt->fetch(PDO::FETCH_ASSOC);
+
+// Calculate statistics
+$total_courses = count($courses);
+$total_credits = 0;
+$total_grade_points = 0;
+$passed_courses = 0;
+
+foreach ($courses as $course) {
+    $total_credits += $course['credit_units'];
+    if (!empty($course['grade']) && $course['grade'] != 'F') {
+        $passed_courses++;
+        $total_grade_points += ($course['grade_points'] ?? 0) * $course['credit_units'];
+    }
+}
+$cgpa = $total_credits > 0 ? $total_grade_points / $total_credits : 0;
+
 $page_title = 'Student Profile';
 $page_icon = 'fas fa-user-graduate';
 $active_page = 'students';
 $breadcrumbs = [
     ['title' => 'Home', 'url' => 'dashboard.php'],
     ['title' => 'Students', 'url' => 'students.php'],
-    ['title' => $student['matric_number']]
+    ['title' => htmlspecialchars($student['first_name'] . ' ' . $student['last_name'])]
 ];
 
 require_once 'includes/header.php';
@@ -91,445 +170,547 @@ require_once 'includes/sidebar.php';
 ?>
 
 <style>
-    .student-profile-layout {
-        display: grid;
-        grid-template-columns: 300px 1fr;
-        gap: 25px;
-    }
-    .student-sidebar {
-        animation: fadeInUp 0.6s ease;
-    }
-    .student-card-sidebar {
-        background: var(--white);
-        border-radius: 20px;
-        box-shadow: var(--shadow-sm);
-        overflow: hidden;
-    }
-    .student-cover {
-        height: 100px;
+    .profile-header {
         background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        border-radius: 20px;
+        padding: 30px 35px;
+        color: var(--white);
+        margin-bottom: 30px;
     }
-    .student-avatar-wrap {
-        text-align: center;
-        margin-top: -50px;
-        padding: 0 20px 20px;
-    }
-    .student-avatar-big {
+    .profile-header .avatar-lg {
         width: 100px;
         height: 100px;
-        border-radius: 24px;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
-        color: var(--white);
-        display: inline-flex;
+        border-radius: 50%;
+        background: var(--white);
+        display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 2rem;
-        font-weight: 800;
-        border: 4px solid var(--white);
-        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        overflow: hidden;
+        border: 4px solid rgba(255,255,255,0.3);
+        flex-shrink: 0;
     }
-    .student-avatar-big img {
+    .profile-header .avatar-lg img {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        border-radius: 24px;
     }
-    .student-name-sidebar {
-        font-size: 1.2rem;
-        font-weight: 700;
-        margin-top: 15px;
+    .profile-header .avatar-lg i {
+        font-size: 3rem;
+        color: var(--primary-color);
     }
-    .student-matric-sidebar {
-        color: var(--text-light);
-        font-size: 0.9rem;
+    .profile-header .student-name {
+        font-size: 1.8rem;
+        font-weight: 800;
         margin-bottom: 5px;
     }
-    .student-status-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 8px;
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-    .student-contact-list {
-        padding: 20px;
-        border-top: 1px solid var(--gray-200);
-    }
-    .student-contact-item {
+    .profile-header .student-meta {
         display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--gray-100);
+        gap: 20px;
+        flex-wrap: wrap;
+        opacity: 0.9;
+        font-size: 0.9rem;
+        margin-top: 10px;
     }
-    .student-contact-item:last-child { border-bottom: none; }
-    .student-contact-icon {
-        width: 34px;
-        height: 34px;
-        border-radius: 8px;
-        background: var(--primary-soft);
-        color: var(--primary-color);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.85rem;
-    }
-    .student-contact-text { font-size: 0.85rem; }
-    .student-contact-text small { display: block; color: var(--text-light); font-size: 0.7rem; }
-
-    .student-main {
-        animation: fadeInUp 0.7s ease;
-    }
-    .student-info-card {
+    .profile-header .student-meta i { margin-right: 5px; }
+    
+    .stat-box {
         background: var(--white);
-        border-radius: 20px;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+        text-align: center;
+        border: 1px solid var(--gray-200);
+        transition: var(--transition);
+    }
+    .stat-box:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-lg);
+    }
+    .stat-box .number {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--primary-color);
+    }
+    .stat-box .label {
+        font-size: 0.85rem;
+        color: var(--text-light);
+        font-weight: 500;
+    }
+    .stat-box .icon {
+        font-size: 1.5rem;
+        opacity: 0.3;
+        margin-bottom: 5px;
+    }
+    
+    .info-section {
+        background: var(--white);
+        border-radius: 16px;
+        padding: 25px;
         box-shadow: var(--shadow-sm);
         margin-bottom: 25px;
-        overflow: hidden;
+        border: 1px solid var(--gray-200);
     }
-    .student-info-header {
-        padding: 20px 25px;
-        border-bottom: 1px solid var(--gray-200);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .student-info-header h4 {
+    .info-section .section-title {
+        font-weight: 700;
         font-size: 1.1rem;
-        font-weight: 700;
-        margin: 0;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .student-info-header h4 i { color: var(--primary-color); }
-    .student-info-body { padding: 25px; }
-    .info-row {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 15px;
-    }
-    .info-block {
-        padding: 15px;
-        background: var(--gray-100);
-        border-radius: 12px;
-    }
-    .info-block-label {
-        font-size: 0.75rem;
-        color: var(--text-light);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 5px;
-        font-weight: 600;
-    }
-    .info-block-value {
-        font-size: 0.95rem;
-        font-weight: 700;
         color: var(--text-dark);
-    }
-
-    .courses-table-student {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-    .courses-table-student thead th {
-        background: var(--gray-100);
-        padding: 14px 16px;
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        color: var(--text-light);
+        margin-bottom: 20px;
+        padding-bottom: 10px;
         border-bottom: 2px solid var(--gray-200);
     }
-    .courses-table-student tbody td {
-        padding: 14px 16px;
-        border-bottom: 1px solid var(--gray-100);
-        font-size: 0.9rem;
+    .info-section .section-title i {
+        color: var(--primary-color);
+        margin-right: 10px;
     }
-    .courses-table-student tbody tr:hover { background: var(--primary-soft); }
-    .grade-cell {
-        padding: 5px 12px;
-        border-radius: 8px;
-        font-size: 0.85rem;
-        font-weight: 700;
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
     }
-    .attendance-chart {
-        display: flex;
-        gap: 10px;
-        align-items: flex-end;
-        height: 120px;
-        padding: 20px;
-    }
-    .attendance-bar {
-        flex: 1;
-        border-radius: 8px 8px 0 0;
-        min-height: 20px;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: flex-end;
-        padding-bottom: 8px;
-        color: var(--white);
-        font-weight: 700;
-        font-size: 0.85rem;
-    }
-    .attendance-bar-present { background: var(--success-color); }
-    .attendance-bar-absent { background: var(--danger-color); }
-    .attendance-bar-late { background: var(--warning-color); }
-    .attendance-bar-excused { background: var(--primary-light); }
-    .attendance-label {
-        text-align: center;
+    .info-item .label {
         font-size: 0.75rem;
+        text-transform: uppercase;
         color: var(--text-light);
-        margin-top: 5px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
     }
-
-    @media (max-width: 991px) {
-        .student-profile-layout { grid-template-columns: 1fr; }
-        .info-row { grid-template-columns: repeat(2, 1fr); }
+    .info-item .value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-top: 2px;
     }
+    .info-item .value i {
+        color: var(--primary-color);
+        margin-right: 8px;
+        width: 18px;
+    }
+    
+    .table-custom {
+        background: var(--white);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+    }
+    .table-custom table { margin-bottom: 0; }
+    .table-custom th {
+        background: var(--gray-100);
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 12px 15px;
+        border-bottom: 2px solid var(--gray-200);
+    }
+    .table-custom td {
+        padding: 10px 15px;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--gray-200);
+    }
+    .table-custom tr:hover td { background: var(--primary-soft); }
+    
+    .grade-badge-sm {
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        display: inline-block;
+        min-width: 35px;
+        text-align: center;
+    }
+    .grade-A { background: #e8f5e9; color: #2e7d32; }
+    .grade-B { background: #e3f2fd; color: #1565c0; }
+    .grade-C { background: #fff3e0; color: #e65100; }
+    .grade-D { background: #f3e5f5; color: #6a1b9a; }
+    .grade-E { background: #fce4ec; color: #c62828; }
+    .grade-F { background: #ffebee; color: #b71c1c; }
+    
+    .status-badge-sm {
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .status-active { background: #e8f5e9; color: var(--success-color); }
+    .status-inactive { background: #ffebee; color: var(--danger-color); }
+    .status-suspended { background: #fff3e0; color: var(--warning-color); }
+    .status-graduated { background: #e3f2fd; color: var(--primary-color); }
+    
+    .status-present { color: var(--success-color); }
+    .status-absent { color: var(--danger-color); }
+    .status-late { color: var(--warning-color); }
+    .status-excused { color: var(--primary-color); }
+    
+    .btn-action {
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
     @media (max-width: 768px) {
-        .info-row { grid-template-columns: 1fr; }
+        .profile-header { padding: 20px; }
+        .profile-header .avatar-lg { width: 70px; height: 70px; }
+        .profile-header .student-name { font-size: 1.3rem; }
+        .info-grid { grid-template-columns: 1fr; }
     }
 </style>
 
-<div class="student-profile-layout">
-    <!-- Sidebar -->
-    <div class="student-sidebar">
-        <div class="student-card-sidebar">
-            <div class="student-cover"></div>
-            <div class="student-avatar-wrap">
-                <div class="student-avatar-big">
-                    <?php if (!empty($student['profile_image'])): ?>
-                        <img src="<?php echo htmlspecialchars($student['profile_image']); ?>" alt="">
-                    <?php else: ?>
-                        <?php echo strtoupper(substr($student['first_name'], 0, 1) . substr($student['last_name'], 0, 1)); ?>
-                    <?php endif; ?>
-                </div>
-                <div class="student-name-sidebar">
-                    <?php echo htmlspecialchars($student['last_name'] . ', ' . $student['first_name'] . ' ' . ($student['middle_name'] ?? '')); ?>
-                </div>
-                <div class="student-matric-sidebar">
-                    <i class="fas fa-id-card me-1"></i><?php echo htmlspecialchars($student['matric_number']); ?>
-                </div>
-                <span class="student-status-badge status-active">
-                    <i class="fas fa-circle" style="font-size: 6px; vertical-align: middle; margin-right: 4px;"></i>
-                    <?php echo $student['status']; ?>
+<!-- Profile Header -->
+<div class="profile-header">
+    <div class="d-flex align-items-center gap-4 flex-wrap">
+        <div class="avatar-lg">
+            <?php if (!empty($student['profile_image']) && file_exists('../' . $student['profile_image'])): ?>
+                <img src="../<?php echo htmlspecialchars($student['profile_image']); ?>" alt="Student">
+            <?php else: ?>
+                <i class="fas fa-user-graduate"></i>
+            <?php endif; ?>
+        </div>
+        <div class="flex-1">
+            <h2 class="student-name">
+                <?php echo htmlspecialchars($student['first_name'] . ' ' . ($student['middle_name'] ?? '') . ' ' . $student['last_name']); ?>
+            </h2>
+            <div class="student-meta">
+                <span><i class="fas fa-id-card"></i> <?php echo htmlspecialchars($student['matric_number']); ?></span>
+                <span><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($student['email']); ?></span>
+                <span><i class="fas fa-phone"></i> <?php echo htmlspecialchars($student['phone'] ?? 'N/A'); ?></span>
+                <span><i class="fas fa-venus-mars"></i> <?php echo htmlspecialchars($student['gender'] ?? 'N/A'); ?></span>
+                <span><i class="fas fa-layer-group"></i> Level <?php echo htmlspecialchars($student['current_level'] ?? 'N/A'); ?></span>
+            </div>
+            <div class="student-meta">
+                <span class="badge bg-light text-dark px-3 py-2">
+                    <i class="fas fa-building me-1"></i> <?php echo htmlspecialchars($student['department_name'] ?? 'N/A'); ?>
+                </span>
+                <span class="badge bg-light text-dark px-3 py-2">
+                    <i class="fas fa-graduation-cap me-1"></i> <?php echo htmlspecialchars($student['program_name'] ?? 'N/A'); ?>
+                </span>
+                <span class="status-badge-sm status-<?php echo strtolower($student['status'] ?? 'active'); ?>">
+                    <?php echo htmlspecialchars($student['status'] ?? 'Active'); ?>
                 </span>
             </div>
-
-            <div class="student-contact-list">
-                <div class="student-contact-item">
-                    <div class="student-contact-icon"><i class="fas fa-envelope"></i></div>
-                    <div class="student-contact-text">
-                        <small>Email</small>
-                        <?php echo htmlspecialchars($student['email']); ?>
-                    </div>
-                </div>
-                <div class="student-contact-item">
-                    <div class="student-contact-icon"><i class="fas fa-phone"></i></div>
-                    <div class="student-contact-text">
-                        <small>Phone</small>
-                        <?php echo htmlspecialchars($student['phone'] ?? 'N/A'); ?>
-                    </div>
-                </div>
-                <div class="student-contact-item">
-                    <div class="student-contact-icon"><i class="fas fa-map-marker-alt"></i></div>
-                    <div class="student-contact-text">
-                        <small>Address</small>
-                        <?php echo htmlspecialchars($student['address'] ?? 'N/A'); ?>
-                    </div>
-                </div>
-                <div class="student-contact-item">
-                    <div class="student-contact-icon"><i class="fas fa-user-friends"></i></div>
-                    <div class="student-contact-text">
-                        <small>Next of Kin</small>
-                        <?php echo htmlspecialchars(($student['kin_name'] ?? 'N/A') . ' (' . ($student['kin_relationship'] ?? '') . ')'); ?>
-                    </div>
-                </div>
-                <div class="student-contact-item">
-                    <div class="student-contact-icon"><i class="fas fa-phone-alt"></i></div>
-                    <div class="student-contact-text">
-                        <small>Kin Phone</small>
-                        <?php echo htmlspecialchars($student['kin_phone'] ?? 'N/A'); ?>
-                    </div>
-                </div>
-            </div>
         </div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="student-main">
-        <!-- Personal Info -->
-        <div class="student-info-card">
-            <div class="student-info-header">
-                <h4><i class="fas fa-user"></i> Personal Information</h4>
-                <a href="message_student.php?id=<?php echo $student_id; ?>" class="btn btn-sm" style="background: var(--primary-soft); color: var(--primary-color); border-radius: 8px; font-weight: 600;">
-                    <i class="fas fa-envelope me-1"></i>Message
+        <div class="ms-auto text-end">
+            <div style="font-size: 0.8rem; opacity: 0.8;">
+                <i class="fas fa-calendar-alt me-1"></i>
+                Registered: <?php echo date('M d, Y', strtotime($student['registration_date'])); ?>
+            </div>
+            <div class="mt-2">
+                <a href="message.php?student=<?php echo $student_id; ?>" class="btn btn-light btn-sm">
+                    <i class="fas fa-envelope me-1"></i> Message
+                </a>
+                <a href="take_attendance.php?student=<?php echo $student_id; ?>" class="btn btn-light btn-sm">
+                    <i class="fas fa-clipboard-check me-1"></i> Attendance
                 </a>
             </div>
-            <div class="student-info-body">
-                <div class="info-row">
-                    <div class="info-block">
-                        <div class="info-block-label">Department</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['department_name'] ?? 'N/A'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Program</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['program_name'] ?? 'N/A'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Current Level</div>
-                        <div class="info-block-value"><?php echo $student['current_level']; ?> Level</div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Gender</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['gender'] ?? 'N/A'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Date of Birth</div>
-                        <div class="info-block-value"><?php echo $student['date_of_birth'] ? date('F d, Y', strtotime($student['date_of_birth'])) : 'N/A'; ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">State of Origin</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['state_of_origin'] ?? 'N/A'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">LGA</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['lga'] ?? 'N/A'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Admission Year</div>
-                        <div class="info-block-value"><?php echo $student['admission_year'] ?? 'N/A'; ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">CGPA</div>
-                        <div class="info-block-value"><?php echo $student['cgpa'] ?? '0.00'; ?></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Medical Info -->
-        <div class="student-info-card">
-            <div class="student-info-header">
-                <h4><i class="fas fa-heartbeat"></i> Medical Information</h4>
-            </div>
-            <div class="student-info-body">
-                <div class="info-row">
-                    <div class="info-block">
-                        <div class="info-block-label">Blood Group</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['blood_group'] ?? 'N/A'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Genotype</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['genotype'] ?? 'N/A'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Allergies</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['allergies'] ?? 'None'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Conditions</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['conditions'] ?? 'None'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Emergency Contact</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['emergency_name'] ?? 'N/A'); ?></div>
-                    </div>
-                    <div class="info-block">
-                        <div class="info-block-label">Emergency Phone</div>
-                        <div class="info-block-value"><?php echo htmlspecialchars($student['emergency_contact'] ?? 'N/A'); ?></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Attendance Summary -->
-        <div class="student-info-card">
-            <div class="student-info-header">
-                <h4><i class="fas fa-chart-pie"></i> Attendance Summary</h4>
-            </div>
-            <div class="student-info-body">
-                <?php 
-                $total_att = array_sum($attendance_summary);
-                if ($total_att > 0): 
-                ?>
-                <div class="attendance-chart">
-                    <?php 
-                    $statuses = ['Present' => 'attendance-bar-present', 'Absent' => 'attendance-bar-absent', 
-                                 'Late' => 'attendance-bar-late', 'Excused' => 'attendance-bar-excused'];
-                    foreach ($statuses as $status => $class): 
-                        $count = $attendance_summary[$status] ?? 0;
-                        $height = $total_att > 0 ? ($count / $total_att * 100) : 0;
-                    ?>
-                    <div style="flex: 1; text-align: center;">
-                        <div class="attendance-bar <?php echo $class; ?>" style="height: <?php echo max($height, 5); ?>%;">
-                            <?php echo $count; ?>
-                        </div>
-                        <div class="attendance-label"><?php echo $status; ?></div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-                <?php else: ?>
-                <div class="text-center py-4">
-                    <i class="fas fa-chart-bar fa-2x text-muted mb-2"></i>
-                    <p class="text-muted">No attendance records found.</p>
-                </div>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Courses & Results -->
-        <div class="student-info-card">
-            <div class="student-info-header">
-                <h4><i class="fas fa-book"></i> Courses & Results</h4>
-            </div>
-            <div class="table-responsive">
-                <table class="courses-table-student">
-                    <thead>
-                        <tr>
-                            <th>Course Code</th>
-                            <th>Course Title</th>
-                            <th>Session</th>
-                            <th>Units</th>
-                            <th>CA</th>
-                            <th>Exam</th>
-                            <th>Total</th>
-                            <th>Grade</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($courses as $course): 
-                            $grade_class = 'grade-preview-null';
-                            if ($course['grade']) {
-                                $g = strtolower($course['grade']);
-                                if ($g == 'a') $grade_class = 'grade-a';
-                                elseif ($g == 'b') $grade_class = 'grade-b';
-                                elseif ($g == 'c') $grade_class = 'grade-c';
-                                elseif (in_array($g, ['d','e'])) $grade_class = 'grade-d';
-                                elseif ($g == 'f') $grade_class = 'grade-f';
-                            }
-                        ?>
-                        <tr>
-                            <td><strong><?php echo htmlspecialchars($course['course_code']); ?></strong></td>
-                            <td><?php echo htmlspecialchars($course['course_title']); ?></td>
-                            <td><?php echo $course['session_year']; ?> - Sem <?php echo $course['semester']; ?></td>
-                            <td><?php echo $course['credit_units']; ?></td>
-                            <td><?php echo $course['ca_score'] ?? '-'; ?></td>
-                            <td><?php echo $course['exam_score'] ?? '-'; ?></td>
-                            <td><strong><?php echo $course['total_score'] ?? '-'; ?></strong></td>
-                            <td>
-                                <span class="grade-cell <?php echo $grade_class; ?>">
-                                    <?php echo $course['grade'] ?? 'N/A'; ?>
-                                </span>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
         </div>
     </div>
-</div> 
+</div>
+
+<!-- Stats Row -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3 col-sm-6">
+        <div class="stat-box">
+            <div class="icon"><i class="fas fa-book"></i></div>
+            <div class="number"><?php echo $total_courses; ?></div>
+            <div class="label">Enrolled Courses</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="stat-box">
+            <div class="icon"><i class="fas fa-star"></i></div>
+            <div class="number"><?php echo number_format($cgpa, 2); ?></div>
+            <div class="label">CGPA</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="stat-box">
+            <div class="icon"><i class="fas fa-check-circle"></i></div>
+            <div class="number"><?php echo $passed_courses; ?>/<?php echo $total_courses; ?></div>
+            <div class="label">Passed Courses</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="stat-box">
+            <div class="icon"><i class="fas fa-credit-card"></i></div>
+            <div class="number"><?php echo count($payments); ?></div>
+            <div class="label">Payments</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Course Enrollment -->
+        <div class="info-section">
+            <div class="section-title">
+                <i class="fas fa-book-open"></i> Course Enrollment
+            </div>
+            <?php if (count($courses) > 0): ?>
+                <div class="table-custom">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Course Code</th>
+                                <th>Course Title</th>
+                                <th>Credits</th>
+                                <th>Semester</th>
+                                <th>Score</th>
+                                <th>Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($courses as $course): ?>
+                            <tr>
+                                <td><strong><?php echo htmlspecialchars($course['course_code']); ?></strong></td>
+                                <td><?php echo htmlspecialchars($course['course_title']); ?></td>
+                                <td><?php echo $course['credit_units']; ?></td>
+                                <td>Sem <?php echo $course['semester']; ?> (<?php echo htmlspecialchars($course['session_year']); ?>)</td>
+                                <td><?php echo isset($course['score']) ? number_format($course['score'], 1) : '-'; ?></td>
+                                <td>
+                                    <?php if (!empty($course['grade'])): ?>
+                                        <span class="grade-badge-sm grade-<?php echo $course['grade']; ?>">
+                                            <?php echo htmlspecialchars($course['grade']); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="text-center py-3 text-muted">
+                    <i class="fas fa-book-open fa-2x mb-2 d-block"></i>
+                    No courses enrolled yet.
+                </div>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Attendance Records -->
+        <div class="info-section">
+            <div class="section-title">
+                <i class="fas fa-clipboard-check"></i> Recent Attendance
+            </div>
+            <?php if (count($attendance_records) > 0): ?>
+                <div class="table-custom">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Course</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($attendance_records as $att): ?>
+                            <tr>
+                                <td><?php echo date('M d, Y', strtotime($att['class_date'])); ?></td>
+                                <td><?php echo htmlspecialchars($att['course_code']); ?></td>
+                                <td>
+                                    <span class="fw-semibold status-<?php echo strtolower($att['status']); ?>">
+                                        <i class="fas fa-<?php echo $att['status'] == 'Present' ? 'check-circle' : ($att['status'] == 'Absent' ? 'times-circle' : ($att['status'] == 'Late' ? 'clock' : 'info-circle')); ?> me-1"></i>
+                                        <?php echo htmlspecialchars($att['status']); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="text-center py-3 text-muted">
+                    <i class="fas fa-clipboard-check fa-2x mb-2 d-block"></i>
+                    No attendance records found.
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Personal Information -->
+        <div class="info-section">
+            <div class="section-title">
+                <i class="fas fa-user"></i> Personal Information
+            </div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="label">Full Name</div>
+                    <div class="value">
+                        <?php echo htmlspecialchars($student['first_name'] . ' ' . ($student['middle_name'] ?? '') . ' ' . $student['last_name']); ?>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Matric Number</div>
+                    <div class="value"><i class="fas fa-id-card"></i> <?php echo htmlspecialchars($student['matric_number']); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Email</div>
+                    <div class="value"><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($student['email']); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Phone</div>
+                    <div class="value"><i class="fas fa-phone"></i> <?php echo htmlspecialchars($student['phone'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Gender</div>
+                    <div class="value"><i class="fas fa-venus-mars"></i> <?php echo htmlspecialchars($student['gender'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Date of Birth</div>
+                    <div class="value"><i class="fas fa-calendar"></i> <?php echo $student['date_of_birth'] ? date('M d, Y', strtotime($student['date_of_birth'])) : 'N/A'; ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Nationality</div>
+                    <div class="value"><i class="fas fa-flag"></i> <?php echo htmlspecialchars($student['nationality'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">State of Origin</div>
+                    <div class="value"><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($student['state_of_origin'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="label">Address</div>
+                    <div class="value"><i class="fas fa-home"></i> <?php echo htmlspecialchars($student['address'] ?? 'N/A'); ?></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Academic Information -->
+        <div class="info-section">
+            <div class="section-title">
+                <i class="fas fa-graduation-cap"></i> Academic Information
+            </div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="label">Program</div>
+                    <div class="value"><?php echo htmlspecialchars($student['program_name'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Department</div>
+                    <div class="value"><?php echo htmlspecialchars($student['department_name'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Faculty</div>
+                    <div class="value"><?php echo htmlspecialchars($student['faculty_name'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Current Level</div>
+                    <div class="value">Level <?php echo htmlspecialchars($student['current_level'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">CGPA</div>
+                    <div class="value"><?php echo number_format($student['cgpa'] ?? 0, 2); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Admission Year</div>
+                    <div class="value"><?php echo htmlspecialchars($student['admission_year'] ?? 'N/A'); ?></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Medical Information -->
+        <?php if ($medical): ?>
+        <div class="info-section">
+            <div class="section-title">
+                <i class="fas fa-heartbeat"></i> Medical Information
+            </div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="label">Blood Group</div>
+                    <div class="value"><?php echo htmlspecialchars($medical['blood_group'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Genotype</div>
+                    <div class="value"><?php echo htmlspecialchars($medical['genotype'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="label">Allergies</div>
+                    <div class="value"><?php echo htmlspecialchars($medical['allergies'] ?? 'None'); ?></div>
+                </div>
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="label">Medical Conditions</div>
+                    <div class="value"><?php echo htmlspecialchars($medical['conditions'] ?? 'None'); ?></div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Next of Kin -->
+        <?php if ($next_of_kin): ?>
+        <div class="info-section">
+            <div class="section-title">
+                <i class="fas fa-users"></i> Next of Kin
+            </div>
+            <div class="info-grid">
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="label">Full Name</div>
+                    <div class="value"><?php echo htmlspecialchars($next_of_kin['full_name'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Relationship</div>
+                    <div class="value"><?php echo htmlspecialchars($next_of_kin['relationship'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item">
+                    <div class="label">Phone</div>
+                    <div class="value"><i class="fas fa-phone"></i> <?php echo htmlspecialchars($next_of_kin['phone'] ?? 'N/A'); ?></div>
+                </div>
+                <div class="info-item" style="grid-column: 1 / -1;">
+                    <div class="label">Address</div>
+                    <div class="value"><?php echo htmlspecialchars($next_of_kin['address'] ?? 'N/A'); ?></div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Payments -->
+        <div class="info-section">
+            <div class="section-title">
+                <i class="fas fa-credit-card"></i> Recent Payments
+            </div>
+            <?php if (count($payments) > 0): ?>
+                <div class="table-custom">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($payments as $payment): ?>
+                            <tr>
+                                <td><?php echo date('M d, Y', strtotime($payment['payment_date'])); ?></td>
+                                <td>₦<?php echo number_format($payment['amount'], 2); ?></td>
+                                <td>
+                                    <span class="status-badge-sm status-<?php echo strtolower($payment['status'] ?? 'pending'); ?>">
+                                        <?php echo htmlspecialchars($payment['status'] ?? 'Pending'); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="text-center py-3 text-muted">
+                    <i class="fas fa-credit-card fa-2x mb-2 d-block"></i>
+                    No payment records found.
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<script>
+    function sendMessage(studentId) {
+        window.location.href = 'message.php?student=' + studentId;
+    }
+    
+    function takeAttendance(studentId) {
+        window.location.href = 'take_attendance.php?student=' + studentId;
+    }
+</script>
+
+<?php require_once 'includes/footer.php'; ob_end_flush(); ?>
