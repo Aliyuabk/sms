@@ -106,7 +106,7 @@ ob_clean();
 <!DOCTYPE html>
 <html lang="en"> 
 <head>
-    <title><?php echo isset($page_title) ? $page_title . ' | ' : ''; ?>Madarasatu Masjib Ibn Abbas</title>
+    <title><?php echo isset($page_title) ? $page_title . ' | ' : ''; ?>M.M.I.A</title>
     
     <!-- Meta -->
     <meta charset="utf-8">
@@ -447,7 +447,7 @@ ob_clean();
             <div class="app-branding">
                 <a class="app-logo" href="dashboard.php">
                     <img class="logo-icon me-2" src="../assets/images/logo.png" alt="logo">
-                    <span class="logo-text">Madarasatu Masjib Ibn Abbass</span>
+                    <span class="logo-text">M.M.I.A</span>
                 </a>
             </div><!--//app-branding-->  
             
