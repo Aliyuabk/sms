@@ -1,8 +1,14 @@
 <?php
 /**
- * Staff Login Page
+ * Staff Login Page - Fixed Version
  * CRITICAL: NO whitespace, BOM, or output before this <?php tag
  */
+
+// ============================================================
+// ERROR REPORTING - Remove in production
+// ============================================================
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 // ============================================================
 // START SESSION — MUST be first
@@ -17,37 +23,92 @@ require_once 'config/database.php';
 // HANDLE LOGIN — BEFORE any output
 // ============================================================
 $error = null;
+$success = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
 
     if (!empty($email) && !empty($password)) {
-        $stmt = $pdo->prepare("SELECT staff_id, staff_number, first_name, last_name, email, 
-                               password_hash, role, status, profile_image 
-                               FROM staff WHERE email = ? AND status IN ('Active', 'On Leave')");
-        $stmt->execute([$email]);
-        $staff = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            // First, check if staff exists with this email
+            $stmt = $pdo->prepare("SELECT staff_id, staff_number, first_name, last_name, email, 
+                                   password_hash, role, status, profile_image, can_login 
+                                   FROM staff WHERE email = ?");
+            $stmt->execute([$email]);
+            $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($staff && password_verify($password, $staff['password_hash'])) {
-            // Update last login
-            $pdo->prepare("UPDATE staff SET last_login = NOW() WHERE staff_id = ?")
-                ->execute([$staff['staff_id']]);
+            // Debug: Check if staff found
+            if (!$staff) {
+                $error = "No account found with this email address.";
+            } 
+            // Check if staff is active
+            elseif ($staff['status'] !== 'Active') {
+                $error = "Your account is currently " . $staff['status'] . ". Please contact support.";
+            }
+            // Check if staff can login
+            elseif ($staff['can_login'] != 1) {
+                $error = "Your account does not have login permissions. Please contact an administrator.";
+            }
+            // Verify password
+            else {
+                // Check if using default password or custom hash
+                $passwordVerified = false;
+                
+                // Try password_verify first
+                if (password_verify($password, $staff['password_hash'])) {
+                    $passwordVerified = true;
+                } 
+                // Check if it's the default hash for "password"
+                elseif ($staff['password_hash'] === '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi' && $password === 'password') {
+                    $passwordVerified = true;
+                    // Re-hash the password for better security
+                    $newHash = password_hash($password, PASSWORD_DEFAULT);
+                    $updateStmt = $pdo->prepare("UPDATE staff SET password_hash = ? WHERE staff_id = ?");
+                    $updateStmt->execute([$newHash, $staff['staff_id']]);
+                }
+                // Check plain text password (temporary for migration)
+                elseif ($password === $staff['password_hash']) {
+                    $passwordVerified = true;
+                    // Re-hash the password
+                    $newHash = password_hash($password, PASSWORD_DEFAULT);
+                    $updateStmt = $pdo->prepare("UPDATE staff SET password_hash = ? WHERE staff_id = ?");
+                    $updateStmt->execute([$newHash, $staff['staff_id']]);
+                }
 
-            // Set session
-            $_SESSION['staff_id'] = $staff['staff_id'];
-            $_SESSION['staff_name'] = $staff['first_name'] . ' ' . $staff['last_name'];
-            $_SESSION['staff_role'] = $staff['role'];
-            $_SESSION['staff_email'] = $staff['email'];
-            $_SESSION['staff_number'] = $staff['staff_number'];
-            $_SESSION['staff_image'] = $staff['profile_image'];
-            $_SESSION['staff_last_login'] = date('Y-m-d H:i:s');
+                if ($passwordVerified) {
+                    // Update last login
+                    $updateStmt = $pdo->prepare("UPDATE staff SET last_login = NOW() WHERE staff_id = ?");
+                    $updateStmt->execute([$staff['staff_id']]);
 
-            // Redirect to dashboard
-            header('Location: dashboard.php');
-            exit;
-        } else {
-            $error = "Invalid email or password!";
+                    // Set session
+                    $_SESSION['staff_id'] = $staff['staff_id'];
+                    $_SESSION['staff_name'] = $staff['first_name'] . ' ' . $staff['last_name'];
+                    $_SESSION['staff_role'] = $staff['role'];
+                    $_SESSION['staff_email'] = $staff['email'];
+                    $_SESSION['staff_number'] = $staff['staff_number'];
+                    $_SESSION['staff_image'] = $staff['profile_image'];
+                    $_SESSION['staff_last_login'] = date('Y-m-d H:i:s');
+
+                    // Log the login
+                    try {
+                        $logStmt = $pdo->prepare("INSERT INTO staff_activity_log (staff_id, activity_type, description, ip_address) 
+                                                  VALUES (?, 'Login', 'Staff logged in successfully', ?)");
+                        $logStmt->execute([$staff['staff_id'], $_SERVER['REMOTE_ADDR'] ?? 'Unknown']);
+                    } catch (Exception $e) {
+                        // Ignore logging errors
+                    }
+
+                    // Redirect to dashboard
+                    header('Location: dashboard.php');
+                    exit;
+                } else {
+                    $error = "Invalid password. Please try again.";
+                }
+            }
+        } catch (PDOException $e) {
+            $error = "Database error: " . $e->getMessage();
+            error_log("Login error: " . $e->getMessage());
         }
     } else {
         $error = "Please fill in all fields.";
@@ -147,6 +208,18 @@ if (isset($_SESSION['staff_id'])) {
             position: relative;
             z-index: 1;
             border: 1px solid var(--gray-200);
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .login-header {
@@ -163,10 +236,16 @@ if (isset($_SESSION['staff_id'])) {
             align-items: center;
             justify-content: center;
             margin: 0 auto 20px;
-            color: var(--white);
-            font-size: 32px;
             box-shadow: 0 8px 24px rgba(63, 116, 156, 0.3);
             transition: var(--transition);
+            overflow: hidden;
+        }
+
+        .login-icon img {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            object-fit: cover;
         }
 
         .login-card:hover .login-icon {
@@ -253,6 +332,7 @@ if (isset($_SESSION['staff_id'])) {
             transition: var(--transition);
             box-shadow: 0 4px 16px rgba(63, 116, 156, 0.3);
             letter-spacing: 0.3px;
+            width: 100%;
         }
 
         .btn-login:hover {
@@ -263,6 +343,10 @@ if (isset($_SESSION['staff_id'])) {
 
         .btn-login:active {
             transform: translateY(0);
+        }
+
+        .btn-login i {
+            margin-right: 8px;
         }
 
         .form-check-input {
@@ -308,6 +392,22 @@ if (isset($_SESSION['staff_id'])) {
 
         .alert-danger i {
             color: var(--danger-color);
+            margin-right: 10px;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+            border: 1px solid rgba(124, 179, 66, 0.2);
+            color: #2e7d32;
+            border-radius: 14px;
+            padding: 14px 18px;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .alert-success i {
+            color: var(--success-color);
+            margin-right: 10px;
         }
 
         .portal-links {
@@ -357,19 +457,16 @@ if (isset($_SESSION['staff_id'])) {
             color: var(--white);
         }
 
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .demo-credentials {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--gray-100);
+            border-radius: 12px;
+            font-size: 0.85rem;
         }
 
-        .login-card {
-            animation: fadeInUp 0.6s ease forwards;
+        .demo-credentials strong {
+            color: var(--primary-color);
         }
 
         @media (max-width: 576px) {
@@ -382,7 +479,11 @@ if (isset($_SESSION['staff_id'])) {
             .login-icon {
                 width: 64px;
                 height: 64px;
-                font-size: 26px;
+            }
+
+            .login-icon img {
+                width: 48px;
+                height: 48px;
             }
 
             .login-header h3 {
@@ -395,23 +496,32 @@ if (isset($_SESSION['staff_id'])) {
     <div class="login-card">
         <div class="login-header">
             <div class="login-icon">
-                <img src="../assets/images/logo.jpeg" alt="Logo" style="width: 60px; height: 60px; border-radius: 8px;">
+                <img src="../assets/images/logo.jpeg" alt="Logo">
             </div>
-            <h3>Staff Signin</h3>
+            <h3>Staff Sign In</h3>
             <p>Sign in to access your dashboard</p>
         </div>
 
         <?php if ($error !== null): ?>
             <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center">
-                <i class="fas fa-exclamation-circle me-2"></i>
+                <i class="fas fa-exclamation-circle"></i>
                 <span><?php echo htmlspecialchars($error); ?></span>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" style="font-size: 0.7rem;"></button>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($success !== null): ?>
+            <div class="alert alert-success alert-dismissible fade show d-flex align-items-center">
+                <i class="fas fa-check-circle"></i>
+                <span><?php echo htmlspecialchars($success); ?></span>
                 <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" style="font-size: 0.7rem;"></button>
             </div>
         <?php endif; ?>
 
         <form method="POST" action="">
             <div class="form-floating">
-                <input type="email" class="form-control" id="email" name="email" placeholder="Email" required>
+                <input type="email" class="form-control" id="email" name="email" placeholder="Email" 
+                       value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" required>
                 <label for="email"><i class="fas fa-envelope"></i>Email Address</label>
             </div>
 
@@ -423,17 +533,33 @@ if (isset($_SESSION['staff_id'])) {
 
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="remember">
+                    <input class="form-check-input" type="checkbox" id="remember" name="remember">
                     <label class="form-check-label" for="remember">Remember me</label>
                 </div>
-                <a href="staff_forgot_password.php" class="forgot-link">Forgot Password?</a>
+                <a href="forgot_password.php" class="forgot-link">Forgot Password?</a>
             </div>
 
-            <button type="submit" class="btn btn-login btn-primary w-100 mb-3">
-                <i class="fas fa-sign-in-alt me-2"></i>Sign In
+            <button type="submit" class="btn-login">
+                <i class="fas fa-sign-in-alt"></i>Sign In
             </button>
         </form>
- 
+
+        <!-- Demo Credentials (Remove in production) -->
+        <div class="demo-credentials">
+            <strong>Demo Credentials:</strong><br>
+            Email: aliyuabubakar11117@gmail.com<br>
+            Password: <span id="demoPassword" style="cursor: pointer;" onclick="fillDemoPassword()">Click to fill</span>
+        </div>
+
+        <div class="portal-links">
+            <p>Access other portals:</p>
+            <a href="../student/index.php" class="student-link">
+                <i class="fas fa-user-graduate"></i> Student Portal
+            </a>
+            <a href="../admin/index.php" class="admin-link">
+                <i class="fas fa-user-shield"></i> Admin Portal
+            </a>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -449,6 +575,18 @@ if (isset($_SESSION['staff_id'])) {
                 icon.classList.replace('fa-eye-slash', 'fa-eye');
             }
         }
+
+        function fillDemoPassword() {
+            document.getElementById('password').value = 'password';
+            document.getElementById('email').value = 'aliyuabubakar11117@gmail.com';
+        }
+
+        // Auto-fill demo credentials (optional)
+        // Uncomment below to auto-fill on page load for testing
+        // window.addEventListener('load', function() {
+        //     document.getElementById('email').value = 'aliyuabubakar11117@gmail.com';
+        //     document.getElementById('password').value = 'password';
+        // });
     </script>
 </body>
-</html> 
+</html>
