@@ -30,6 +30,17 @@ require_once 'config/database.php';
 $staff_id = $_SESSION['staff_id'];
 
 // ============================================================
+// INITIALIZE VARIABLES WITH DEFAULTS
+// ============================================================
+$staff = null;
+$courses = [];
+$total_courses = 0;
+$total_students = 0;
+$current_session = null;
+$error = null;
+$debug_info = [];
+
+// ============================================================
 // FETCH STAFF DATA
 // ============================================================
 try {
@@ -58,54 +69,152 @@ try {
     $staff['staff_name'] = $staff['first_name'] . ' ' . $staff['last_name'];
     $_SESSION['staff_name'] = $staff['staff_name'];
 
-    // Fetch courses taught by this staff
-    $stmt2 = $pdo->prepare("
-        SELECT 
-            c.course_id,
-            c.course_code,
-            c.course_title,
-            c.credit_units,
-            ca.session_year,
-            ca.semester,
-            ca.assigned_date,
-            ca.status as assignment_status,
-            ca.level,
-            COUNT(DISTINCT cr.student_id) as number_of_students
-        FROM course_assignments ca
-        JOIN courses c ON ca.course_id = c.course_id
-        LEFT JOIN course_registrations cr ON ca.course_id = cr.course_id 
-            AND ca.session_year = cr.session_year 
-            AND ca.semester = cr.semester
-            AND cr.registration_status = 'Approved'
-        WHERE ca.staff_id = ?
-        AND ca.status = 'Active'
-        GROUP BY c.course_id, c.course_code, c.course_title, c.credit_units, 
-                 ca.session_year, ca.semester, ca.assigned_date, ca.status, ca.level
-        ORDER BY ca.session_year DESC, ca.semester DESC
-    ");
-    $stmt2->execute([$staff_id]);
-    $courses = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-
-    // Calculate totals
-    $total_courses = count($courses);
-    $total_students = 0;
-    foreach ($courses as $course) {
-        $total_students += $course['number_of_students'];
+    // ============================================================
+    // FETCH COURSES - With better error handling
+    // ============================================================
+    try {
+        // First check if course_assignments table exists and has data
+        $tableCheck = $pdo->query("SHOW TABLES LIKE 'course_assignments'");
+        if ($tableCheck->rowCount() > 0) {
+            
+            // Check if there are assignments for this staff
+            $checkStmt = $pdo->prepare("SELECT COUNT(*) as count FROM course_assignments WHERE staff_id = ? AND status = 'Active'");
+            $checkStmt->execute([$staff_id]);
+            $assignmentCount = $checkStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($assignmentCount && $assignmentCount['count'] > 0) {
+                // Fetch courses with student counts
+                $stmt2 = $pdo->prepare("
+                    SELECT 
+                        c.course_id,
+                        c.course_code,
+                        c.course_title,
+                        c.credit_units,
+                        ca.session_year,
+                        ca.semester,
+                        ca.assigned_date,
+                        ca.status as assignment_status,
+                        ca.level,
+                        COUNT(DISTINCT cr.student_id) as number_of_students
+                    FROM course_assignments ca
+                    JOIN courses c ON ca.course_id = c.course_id
+                    LEFT JOIN course_registrations cr ON ca.course_id = cr.course_id 
+                        AND ca.session_year = cr.session_year 
+                        AND ca.semester = cr.semester
+                        AND cr.registration_status = 'Approved'
+                    WHERE ca.staff_id = ?
+                    AND ca.status = 'Active'
+                    GROUP BY c.course_id, c.course_code, c.course_title, c.credit_units, 
+                             ca.session_year, ca.semester, ca.assigned_date, ca.status, ca.level
+                    ORDER BY ca.session_year DESC, ca.semester DESC
+                ");
+                $stmt2->execute([$staff_id]);
+                $courses = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+            } else {
+                // No active assignments, try to get all courses the staff might be teaching
+                $stmt2 = $pdo->prepare("
+                    SELECT 
+                        c.course_id,
+                        c.course_code,
+                        c.course_title,
+                        c.credit_units,
+                        '2025/2026' as session_year,
+                        1 as semester,
+                        NULL as assigned_date,
+                        'Active' as assignment_status,
+                        100 as level,
+                        0 as number_of_students
+                    FROM courses c
+                    WHERE c.department_id = (SELECT department_id FROM staff WHERE staff_id = ?)
+                    LIMIT 5
+                ");
+                $stmt2->execute([$staff_id]);
+                $courses = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+                
+                if (empty($courses)) {
+                    $courses = [];
+                }
+            }
+        } else {
+            // course_assignments table doesn't exist, try to get courses from department
+            $stmt2 = $pdo->prepare("
+                SELECT 
+                    course_id,
+                    course_code,
+                    course_title,
+                    credit_units,
+                    '2025/2026' as session_year,
+                    1 as semester,
+                    NULL as assigned_date,
+                    'Active' as assignment_status,
+                    level,
+                    0 as number_of_students
+                FROM courses
+                WHERE department_id = (SELECT department_id FROM staff WHERE staff_id = ?)
+                LIMIT 5
+            ");
+            $stmt2->execute([$staff_id]);
+            $courses = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+        }
+        
+        // Calculate totals
+        $total_courses = count($courses);
+        foreach ($courses as $course) {
+            $total_students += ($course['number_of_students'] ?? 0);
+        }
+        
+    } catch (PDOException $e) {
+        // If course query fails, just set empty arrays
+        error_log("Course query error: " . $e->getMessage());
+        $courses = [];
+        $total_courses = 0;
+        $total_students = 0;
     }
-    $staff['total_courses'] = $total_courses;
-    $staff['total_students'] = $total_students;
 
-    // Get current session
-    $current_session = $pdo->query("
-        SELECT session_year, semester, session_name 
-        FROM academic_sessions 
-        WHERE is_current = 1 
-        LIMIT 1
-    ")->fetch(PDO::FETCH_ASSOC);
+    // ============================================================
+    // GET CURRENT SESSION
+    // ============================================================
+    try {
+        $sessionStmt = $pdo->query("
+            SELECT session_year, semester, session_name 
+            FROM academic_sessions 
+            WHERE is_current = 1 
+            LIMIT 1
+        ");
+        $current_session = $sessionStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$current_session) {
+            $current_session = ['session_year' => '2025/2026', 'semester' => 1];
+        }
+    } catch (PDOException $e) {
+        error_log("Session query error: " . $e->getMessage());
+        $current_session = ['session_year' => '2025/2026', 'semester' => 1];
+    }
+
+    // ============================================================
+    // STORE IN SESSION FOR HEADER DISPLAY
+    // ============================================================
+    $_SESSION['staff_last_login'] = $staff['last_login'] ?? date('Y-m-d H:i:s');
 
 } catch (PDOException $e) {
     error_log("Dashboard Error: " . $e->getMessage());
     $error = "Unable to load dashboard data. Please try again later.";
+    // Set defaults to prevent undefined errors
+    $staff = [
+        'staff_name' => $_SESSION['staff_name'] ?? 'Staff',
+        'staff_number' => 'N/A',
+        'email' => $_SESSION['staff_email'] ?? 'N/A',
+        'phone' => 'N/A',
+        'role' => $_SESSION['staff_role'] ?? 'Staff',
+        'department_name' => 'N/A',
+        'contract_status' => 'Active',
+        'employment_type' => 'N/A',
+        'employment_date' => 'N/A',
+        'profile_image' => null
+    ];
+    $courses = [];
+    $total_courses = 0;
+    $total_students = 0;
+    $current_session = ['session_year' => 'N/A', 'semester' => 'N/A'];
 }
 
 // ============================================================
@@ -884,12 +993,12 @@ require_once 'includes/sidebar.php';
 </div>
 
 <div class="row g-4" id="coursesContainer">
-    <?php if (count($courses) > 0): ?>
+    <?php if (!empty($courses) && count($courses) > 0): ?>
         <?php foreach ($courses as $course): ?>
         <div class="col-md-6 col-lg-4 course-item">
             <div class="course-card">
                 <div class="course-header">
-                    <span class="course-code"><?php echo htmlspecialchars($course['course_code']); ?></span>
+                    <span class="course-code"><?php echo htmlspecialchars($course['course_code'] ?? 'N/A'); ?></span>
                     <span class="course-status status-active">
                         <span class="status-dot"></span>
                         <?php echo htmlspecialchars($course['assignment_status'] ?? 'Active'); ?>
@@ -897,7 +1006,7 @@ require_once 'includes/sidebar.php';
                 </div>
 
                 <div class="course-body">
-                    <h5 class="course-title"><?php echo htmlspecialchars($course['course_title']); ?></h5>
+                    <h5 class="course-title"><?php echo htmlspecialchars($course['course_title'] ?? 'Untitled Course'); ?></h5>
 
                     <div class="course-meta">
                         <div class="course-meta-item">
@@ -942,7 +1051,7 @@ require_once 'includes/sidebar.php';
 
                 <div class="course-footer">
                     <i class="fas fa-calendar"></i>
-                    <?php echo htmlspecialchars($course['session_year']); ?> - Semester <?php echo htmlspecialchars($course['semester']); ?>
+                    <?php echo htmlspecialchars($course['session_year'] ?? 'N/A'); ?> - Semester <?php echo htmlspecialchars($course['semester'] ?? 1); ?>
                 </div>
             </div>
         </div>
@@ -955,6 +1064,10 @@ require_once 'includes/sidebar.php';
                 </div>
                 <h5 class="empty-title">No courses assigned yet</h5>
                 <p class="empty-text">You don't have any active course assignments for the current session.</p>
+                <p class="empty-text" style="font-size: 0.8rem; color: var(--gray-500); margin-top: 10px;">
+                    <i class="fas fa-info-circle"></i> 
+                    Contact your administrator to assign courses to you.
+                </p>
             </div>
         </div>
     <?php endif; ?>
@@ -993,6 +1106,20 @@ require_once 'includes/sidebar.php';
         </a>
     </div>
 </div>
+
+<!-- Debug Info (Remove in production) -->
+<?php if (isset($_GET['debug'])): ?>
+<div class="mt-4 p-3 bg-light border rounded" style="font-size: 0.8rem;">
+    <h6>Debug Information</h6>
+    <pre><?php 
+    echo "Staff ID: " . $staff_id . "\n";
+    echo "Total Courses: " . $total_courses . "\n";
+    echo "Total Students: " . $total_students . "\n";
+    echo "Courses Count: " . count($courses) . "\n";
+    echo "Staff Data: " . print_r($staff, true);
+    ?></pre>
+</div>
+<?php endif; ?>
 
 <script>
     // View Toggle
