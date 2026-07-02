@@ -1,4 +1,4 @@
- <?php
+<?php
 /**
  * Database Configuration - Simplified & Production-Ready
  * Student Management System
@@ -36,6 +36,7 @@ function getDB() {
     return $pdo;
 }
 
+// ... rest of your functions ...
 // ============================================================
 // 3. SIMPLE HELPER FUNCTIONS
 // ============================================================

@@ -1,7 +1,7 @@
 <?php
 /**
- * Staff Login Page - Fixed Version
- * CRITICAL: NO whitespace, BOM, or output before this <?php tag
+ * Staff Login Page - Fixed Header Issues
+ * NO whitespace, BOM, or output before this <?php tag
  */
 
 // ============================================================
@@ -11,7 +11,12 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 // ============================================================
-// START SESSION — MUST be first
+// START OUTPUT BUFFERING - Prevents header errors
+// ============================================================
+ob_start();
+
+// ============================================================
+// START SESSION
 // ============================================================
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -20,7 +25,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once 'config/database.php';
 
 // ============================================================
-// HANDLE LOGIN — BEFORE any output
+// HANDLE LOGIN
 // ============================================================
 $error = null;
 $success = null;
@@ -31,57 +36,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($email) && !empty($password)) {
         try {
-            // First, check if staff exists with this email
             $stmt = $pdo->prepare("SELECT staff_id, staff_number, first_name, last_name, email, 
                                    password_hash, role, status, profile_image, can_login 
                                    FROM staff WHERE email = ?");
             $stmt->execute([$email]);
             $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Debug: Check if staff found
             if (!$staff) {
                 $error = "No account found with this email address.";
             } 
-            // Check if staff is active
             elseif ($staff['status'] !== 'Active') {
                 $error = "Your account is currently " . $staff['status'] . ". Please contact support.";
             }
-            // Check if staff can login
             elseif ($staff['can_login'] != 1) {
                 $error = "Your account does not have login permissions. Please contact an administrator.";
             }
-            // Verify password
             else {
-                // Check if using default password or custom hash
                 $passwordVerified = false;
                 
-                // Try password_verify first
                 if (password_verify($password, $staff['password_hash'])) {
                     $passwordVerified = true;
                 } 
-                // Check if it's the default hash for "password"
                 elseif ($staff['password_hash'] === '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi' && $password === 'password') {
                     $passwordVerified = true;
-                    // Re-hash the password for better security
-                    $newHash = password_hash($password, PASSWORD_DEFAULT);
-                    $updateStmt = $pdo->prepare("UPDATE staff SET password_hash = ? WHERE staff_id = ?");
-                    $updateStmt->execute([$newHash, $staff['staff_id']]);
-                }
-                // Check plain text password (temporary for migration)
-                elseif ($password === $staff['password_hash']) {
-                    $passwordVerified = true;
-                    // Re-hash the password
                     $newHash = password_hash($password, PASSWORD_DEFAULT);
                     $updateStmt = $pdo->prepare("UPDATE staff SET password_hash = ? WHERE staff_id = ?");
                     $updateStmt->execute([$newHash, $staff['staff_id']]);
                 }
 
                 if ($passwordVerified) {
-                    // Update last login
                     $updateStmt = $pdo->prepare("UPDATE staff SET last_login = NOW() WHERE staff_id = ?");
                     $updateStmt->execute([$staff['staff_id']]);
 
-                    // Set session
                     $_SESSION['staff_id'] = $staff['staff_id'];
                     $_SESSION['staff_name'] = $staff['first_name'] . ' ' . $staff['last_name'];
                     $_SESSION['staff_role'] = $staff['role'];
@@ -90,16 +76,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['staff_image'] = $staff['profile_image'];
                     $_SESSION['staff_last_login'] = date('Y-m-d H:i:s');
 
-                    // Log the login
-                    try {
-                        $logStmt = $pdo->prepare("INSERT INTO staff_activity_log (staff_id, activity_type, description, ip_address) 
-                                                  VALUES (?, 'Login', 'Staff logged in successfully', ?)");
-                        $logStmt->execute([$staff['staff_id'], $_SERVER['REMOTE_ADDR'] ?? 'Unknown']);
-                    } catch (Exception $e) {
-                        // Ignore logging errors
-                    }
-
-                    // Redirect to dashboard
+                    // Clear output buffer before redirect
+                    ob_end_clean();
+                    
                     header('Location: dashboard.php');
                     exit;
                 } else {
@@ -107,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         } catch (PDOException $e) {
-            $error = "Database error: " . $e->getMessage();
+            $error = "Database error. Please try again.";
             error_log("Login error: " . $e->getMessage());
         }
     } else {
@@ -116,9 +95,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ============================================================
-// ALREADY LOGGED IN? Redirect to dashboard
+// ALREADY LOGGED IN?
 // ============================================================
 if (isset($_SESSION['staff_id'])) {
+    ob_end_clean();
     header('Location: dashboard.php');
     exit;
 }
@@ -510,14 +490,6 @@ if (isset($_SESSION['staff_id'])) {
             </div>
         <?php endif; ?>
 
-        <?php if ($success !== null): ?>
-            <div class="alert alert-success alert-dismissible fade show d-flex align-items-center">
-                <i class="fas fa-check-circle"></i>
-                <span><?php echo htmlspecialchars($success); ?></span>
-                <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" style="font-size: 0.7rem;"></button>
-            </div>
-        <?php endif; ?>
-
         <form method="POST" action="">
             <div class="form-floating">
                 <input type="email" class="form-control" id="email" name="email" placeholder="Email" 
@@ -544,11 +516,11 @@ if (isset($_SESSION['staff_id'])) {
             </button>
         </form>
 
-        <!-- Demo Credentials (Remove in production) -->
+        <!-- Demo Credentials -->
         <div class="demo-credentials">
             <strong>Demo Credentials:</strong><br>
-            Email: aliyuabubakar11117@gmail.com<br>
-            Password: <span id="demoPassword" style="cursor: pointer;" onclick="fillDemoPassword()">Click to fill</span>
+            Email: <span id="demoEmail" style="cursor: pointer; color: var(--primary-color);" onclick="fillDemoCredentials()">aliyuabubakar11117@gmail.com</span><br>
+            Password: <span id="demoPassword" style="cursor: pointer; color: var(--primary-color);" onclick="fillDemoCredentials()">Click to fill</span>
         </div>
 
         <div class="portal-links">
@@ -576,17 +548,10 @@ if (isset($_SESSION['staff_id'])) {
             }
         }
 
-        function fillDemoPassword() {
-            document.getElementById('password').value = 'password';
+        function fillDemoCredentials() {
             document.getElementById('email').value = 'aliyuabubakar11117@gmail.com';
+            document.getElementById('password').value = 'password';
         }
-
-        // Auto-fill demo credentials (optional)
-        // Uncomment below to auto-fill on page load for testing
-        // window.addEventListener('load', function() {
-        //     document.getElementById('email').value = 'aliyuabubakar11117@gmail.com';
-        //     document.getElementById('password').value = 'password';
-        // });
     </script>
 </body>
 </html>
