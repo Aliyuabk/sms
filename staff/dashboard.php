@@ -10,18 +10,69 @@ if (!isset($_SESSION['staff_id'])) {
 
 $staff_id = $_SESSION['staff_id'];
 
-// Fetch staff dashboard data
-$stmt = $pdo->prepare("SELECT * FROM staff_dashboard WHERE staff_id = ?");
+// Fetch staff data from the actual staff table
+$stmt = $pdo->prepare("
+    SELECT 
+        s.*,
+        d.department_name,
+        r.role_name as role_name
+    FROM staff s
+    LEFT JOIN departments d ON s.department_id = d.department_id
+    LEFT JOIN staff_roles r ON s.staff_role_id = r.role_id
+    WHERE s.staff_id = ?
+");
 $stmt->execute([$staff_id]);
 $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Fetch courses with student counts
-$stmt2 = $pdo->prepare("SELECT * FROM staff_course_students WHERE staff_id = ? ORDER BY session_year DESC, semester DESC");
+// If staff not found, logout
+if (!$staff) {
+    session_destroy();
+    header('Location: index.php');
+    exit;
+}
+
+// Alias staff_name for header display
+$staff['staff_name'] = $staff['first_name'] . ' ' . $staff['last_name'];
+
+// Fetch courses taught by this staff member
+$stmt2 = $pdo->prepare("
+    SELECT 
+        c.course_id,
+        c.course_code,
+        c.course_title,
+        c.credit_units,
+        ca.session_year,
+        ca.semester,
+        ca.assigned_date,
+        ca.status as assignment_status,
+        COALESCE(cr.student_count, 0) as number_of_students,
+        ca.level
+    FROM course_assignments ca
+    JOIN courses c ON ca.course_id = c.course_id
+    LEFT JOIN (
+        SELECT course_id, session_year, semester, COUNT(*) as student_count
+        FROM course_registrations
+        GROUP BY course_id, session_year, semester
+    ) cr ON ca.course_id = cr.course_id AND ca.session_year = cr.session_year AND ca.semester = cr.semester
+    WHERE ca.staff_id = ?
+    AND ca.status = 'Active'
+    ORDER BY ca.session_year DESC, ca.semester DESC
+");
 $stmt2->execute([$staff_id]);
 $courses = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 
 // Get current session
 $current_session = $pdo->query("SELECT session_year, semester FROM academic_sessions WHERE is_current = 1 LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+
+// Calculate total students from courses
+$total_students = 0;
+foreach ($courses as $course) {
+    $total_students += $course['number_of_students'];
+}
+
+// Add data to staff array for display
+$staff['total_courses'] = count($courses);
+$staff['total_students'] = $total_students;
 
 // Page variables for header
 $page_title = 'Dashboard';
@@ -38,7 +89,6 @@ require_once 'includes/header.php';
 // Include sidebar
 require_once 'includes/sidebar.php';
 ?>
-
 <style>
     /* ===== PROFILE HERO ===== */
     .profile-hero {
