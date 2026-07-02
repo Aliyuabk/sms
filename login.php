@@ -570,7 +570,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
                      onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22><circle cx=%2260%22 cy=%2260%22 r=%2255%22 fill=%22%23c5ea4f%22/><text x=%2260%22 y=%2270%22 text-anchor=%22middle%22 fill=%22%233f749c%22 font-size=%2240%22 font-weight=%22bold%22>5G</text></svg>'">
             </div>
             <div class="school-name">
-                5G E-GURUSCHOOL<br>
+                MADARASATU MASJIB IBN ABBA<br>
                 <span style="font-size: 9px; font-weight: 400; opacity: 0.8;">Student Portal</span>
             </div>
 
