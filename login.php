@@ -650,7 +650,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
                     </div>
 
                     <!-- Forgot password with icon -->
-                    <a href="forgot-password.php" class="forgot-link">
+                    <a href="#" class="forgot-link">
                         <i class="fas fa-key"></i> forgot Password?
                     </a>
 
