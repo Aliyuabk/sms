@@ -1,86 +1,113 @@
 <?php
-session_start();
-require_once 'config/database.php';
+/**
+ * View Class Page
+ * View detailed information about a specific class
+ */
 
-// Auth check
+ob_start();
+session_start();
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 if (!isset($_SESSION['staff_id'])) {
+    ob_end_clean();
     header('Location: index.php');
     exit;
 }
 
+require_once 'config/database.php';
+
 $staff_id = $_SESSION['staff_id'];
-$course_id = isset($_GET['course']) ? intval($_GET['course']) : 0;
+$course_id = $_GET['course'] ?? 0;
 
 if (!$course_id) {
-    header('Location: dashboard.php');
+    header('Location: courses.php');
     exit;
 }
 
-// Fetch course details with staff verification
-$stmt = $pdo->prepare("
-    SELECT c.*, ca.session_year, ca.semester, ca.assignment_id,
-           d.department_name, COUNT(cr.student_id) as total_students
+// Get staff info
+$stmt = $pdo->prepare("SELECT * FROM staff WHERE staff_id = ?");
+$stmt->execute([$staff_id]);
+$staff = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Verify staff teaches this course
+$checkStmt = $pdo->prepare("
+    SELECT * FROM course_assignments 
+    WHERE staff_id = ? AND course_id = ? AND status = 'Active'
+");
+$checkStmt->execute([$staff_id, $course_id]);
+if (!$checkStmt->fetch()) {
+    header('Location: courses.php?error=unauthorized');
+    exit;
+}
+
+// Get course details
+$courseStmt = $pdo->prepare("
+    SELECT c.*, ca.session_year, ca.semester, ca.assigned_date
     FROM courses c
     JOIN course_assignments ca ON c.course_id = ca.course_id
-    LEFT JOIN departments d ON c.department_id = d.department_id
-    LEFT JOIN course_registrations cr ON c.course_id = cr.course_id 
-        AND cr.session_year = ca.session_year 
-        AND cr.semester = ca.semester 
-        AND cr.registration_status = 'Approved'
-    WHERE c.course_id = ? AND ca.staff_id = ? AND ca.status = 'Active'
-    GROUP BY c.course_id
+    WHERE c.course_id = ?
 ");
-$stmt->execute([$course_id, $staff_id]);
-$course = $stmt->fetch(PDO::FETCH_ASSOC);
+$courseStmt->execute([$course_id]);
+$course = $courseStmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$course) {
-    header('Location: dashboard.php');
-    exit;
-}
-
-// Fetch enrolled students with their details
-$stmt2 = $pdo->prepare("
-    SELECT s.student_id, s.matric_number, s.first_name, s.middle_name, s.last_name, 
-           s.email, s.phone, s.gender, s.current_level, s.status as student_status,
-           s.profile_image, cr.registration_date, cr.attendance_percentage,
-           r.ca_score, r.exam_score, r.total_score, r.grade, r.grade_points
+// Get students enrolled
+$studentStmt = $pdo->prepare("
+    SELECT 
+        s.student_id,
+        s.matric_number,
+        s.first_name,
+        s.last_name,
+        s.email,
+        s.phone,
+        s.gender,
+        s.profile_image,
+        s.registration_date,
+        cr.registration_date as enrolled_date,
+        cr.registration_status
     FROM students s
     JOIN course_registrations cr ON s.student_id = cr.student_id
-    LEFT JOIN results r ON s.student_id = r.student_id 
-        AND r.course_id = ? 
-        AND r.session_year = ? 
-        AND r.semester = ?
-    WHERE cr.course_id = ? 
-        AND cr.session_year = ? 
-        AND cr.semester = ? 
-        AND cr.registration_status = 'Approved'
+    WHERE cr.course_id = ? AND cr.registration_status = 'Approved'
     ORDER BY s.last_name, s.first_name
 ");
-$stmt2->execute([
-    $course_id, $course['session_year'], $course['semester'],
-    $course_id, $course['session_year'], $course['semester']
-]);
-$students = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+$studentStmt->execute([$course_id]);
+$students = $studentStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get staff data for header/sidebar
-$stmt3 = $pdo->prepare("SELECT * FROM staff_dashboard WHERE staff_id = ?");
-$stmt3->execute([$staff_id]);
-$staff = $stmt3->fetch(PDO::FETCH_ASSOC);
+// Get attendance summary
+$attStmt = $pdo->prepare("
+    SELECT 
+        COUNT(*) as total_classes,
+        SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present_count,
+        SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent_count,
+        SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late_count,
+        SUM(CASE WHEN status = 'Excused' THEN 1 ELSE 0 END) as excused_count
+    FROM attendance
+    WHERE course_id = ?
+");
+$attStmt->execute([$course_id]);
+$attendance_summary = $attStmt->fetch(PDO::FETCH_ASSOC);
 
-// Calculate stats
-$total_students = count($students);
-$present_today = 0; // Would need attendance table query
-$graded_count = count(array_filter($students, fn($s) => !empty($s['grade'])));
-$avg_score = $total_students > 0 ? round(array_sum(array_column($students, 'total_score')) / $total_students, 2) : 0;
+// Get results summary
+$resultStmt = $pdo->prepare("
+    SELECT 
+        COUNT(*) as total_results,
+        AVG(total_score) as avg_score,
+        MIN(total_score) as min_score,
+        MAX(total_score) as max_score
+    FROM results
+    WHERE course_id = ? AND is_published = 1
+");
+$resultStmt->execute([$course_id]);
+$result_summary = $resultStmt->fetch(PDO::FETCH_ASSOC);
 
-// Page variables
-$page_title = htmlspecialchars($course['course_code']);
+$page_title = 'View Class';
 $page_icon = 'fas fa-users';
 $active_page = 'courses';
 $breadcrumbs = [
     ['title' => 'Home', 'url' => 'dashboard.php'],
     ['title' => 'My Courses', 'url' => 'courses.php'],
-    ['title' => $course['course_code']]
+    ['title' => htmlspecialchars($course['course_code'] ?? 'Class')]
 ];
 
 require_once 'includes/header.php';
@@ -88,594 +115,327 @@ require_once 'includes/sidebar.php';
 ?>
 
 <style>
-    .course-header-hero {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-        border-radius: 24px;
-        padding: 35px;
+    .class-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        border-radius: 20px;
+        padding: 30px 35px;
         color: var(--white);
         margin-bottom: 30px;
-        animation: fadeInUp 0.6s ease;
     }
-    .course-header-top {
+    .class-header h3 {
+        font-weight: 800;
+        margin-bottom: 5px;
+    }
+    .class-header .class-meta {
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        flex-wrap: wrap;
         gap: 20px;
-    }
-    .course-code-big {
-        background: var(--secondary-color);
-        color: var(--primary-dark);
-        padding: 8px 20px;
-        border-radius: 12px;
-        font-size: 1.1rem;
-        font-weight: 800;
-        letter-spacing: 1px;
-        display: inline-block;
-        margin-bottom: 15px;
-    }
-    .course-title-big {
-        font-size: 1.8rem;
-        font-weight: 800;
-        margin-bottom: 15px;
-    }
-    .course-meta-row {
-        display: flex;
-        gap: 25px;
         flex-wrap: wrap;
+        margin-top: 10px;
         opacity: 0.9;
-    }
-    .course-meta-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.95rem;
-    }
-    .course-actions-top {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-    .btn-hero {
-        padding: 12px 24px;
-        border-radius: 12px;
-        font-weight: 600;
         font-size: 0.9rem;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        transition: var(--transition);
-        border: none;
-        cursor: pointer;
     }
-    .btn-hero-primary {
-        background: var(--secondary-color);
-        color: var(--primary-dark);
-    }
-    .btn-hero-primary:hover {
-        background: var(--accent-color);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(197, 234, 79, 0.3);
-    }
-    .btn-hero-outline {
-        background: rgba(255,255,255,0.15);
-        color: var(--white);
-        border: 1px solid rgba(255,255,255,0.3);
-    }
-    .btn-hero-outline:hover {
-        background: rgba(255,255,255,0.25);
-        color: var(--white);
-    }
-
-    .filter-bar {
+    .class-header .class-meta i { margin-right: 5px; }
+    
+    .info-card {
         background: var(--white);
         border-radius: 16px;
-        padding: 20px 25px;
-        margin-bottom: 25px;
+        padding: 20px;
         box-shadow: var(--shadow-sm);
-        display: flex;
-        gap: 15px;
-        align-items: center;
-        flex-wrap: wrap;
-        animation: fadeInUp 0.5s ease;
+        height: 100%;
+        transition: var(--transition);
+        border: 1px solid var(--gray-200);
     }
-    .filter-group {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    .info-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-lg);
     }
-    .filter-label {
+    .info-card .number {
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--primary-color);
+    }
+    .info-card .label {
         font-size: 0.85rem;
-        font-weight: 600;
         color: var(--text-light);
+        font-weight: 500;
     }
-    .filter-input, .filter-select {
-        padding: 10px 15px;
-        border: 1px solid var(--gray-300);
-        border-radius: 10px;
-        font-size: 0.9rem;
-        transition: var(--transition);
-        min-width: 180px;
+    .info-card .icon {
+        float: right;
+        font-size: 2rem;
+        opacity: 0.2;
+        color: var(--primary-color);
     }
-    .filter-input:focus, .filter-select:focus {
-        outline: none;
-        border-color: var(--primary-light);
-        box-shadow: 0 0 0 3px rgba(63, 116, 156, 0.1);
-    }
-    .btn-filter {
-        padding: 10px 20px;
-        background: var(--primary-color);
-        color: var(--white);
-        border: none;
-        border-radius: 10px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: var(--transition);
-    }
-    .btn-filter:hover {
-        background: var(--primary-dark);
-        transform: translateY(-2px);
-    }
-    .btn-export {
-        padding: 10px 20px;
-        background: var(--success-color);
-        color: var(--white);
-        border: none;
-        border-radius: 10px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: var(--transition);
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .btn-export:hover {
-        background: #689f38;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(124, 179, 66, 0.3);
-    }
-
-    .students-table-wrap {
+    
+    .student-list-table {
         background: var(--white);
-        border-radius: 20px;
-        box-shadow: var(--shadow-sm);
+        border-radius: 16px;
         overflow: hidden;
-        animation: fadeInUp 0.6s ease;
+        box-shadow: var(--shadow-sm);
     }
-    .students-table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-    .students-table thead th {
+    .student-list-table table { margin-bottom: 0; }
+    .student-list-table th {
         background: var(--gray-100);
-        padding: 16px 20px;
+        font-weight: 600;
         font-size: 0.8rem;
-        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: var(--text-light);
+        padding: 12px 15px;
         border-bottom: 2px solid var(--gray-200);
-        white-space: nowrap;
     }
-    .students-table tbody td {
-        padding: 16px 20px;
-        font-size: 0.9rem;
-        border-bottom: 1px solid var(--gray-100);
+    .student-list-table td {
+        padding: 10px 15px;
         vertical-align: middle;
+        border-bottom: 1px solid var(--gray-200);
     }
-    .students-table tbody tr {
-        transition: var(--transition);
-    }
-    .students-table tbody tr:hover {
+    .student-list-table tr:hover td { background: var(--primary-soft); }
+    
+    .student-avatar-sm {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
         background: var(--primary-soft);
-    }
-    .student-cell {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    .student-table-avatar {
-        width: 42px;
-        height: 42px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
-        color: var(--white);
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 0.85rem;
-        flex-shrink: 0;
+        font-size: 0.75rem;
+        color: var(--primary-color);
+        overflow: hidden;
     }
-    .student-table-avatar img {
+    .student-avatar-sm img {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        border-radius: 12px;
     }
-    .student-name {
-        font-weight: 600;
-        color: var(--text-dark);
-    }
-    .student-matric {
-        font-size: 0.8rem;
-        color: var(--text-light);
-    }
-    .badge-status {
-        padding: 6px 12px;
-        border-radius: 8px;
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-    .status-active { background: #e8f5e9; color: var(--success-color); }
-    .status-inactive { background: #ffebee; color: var(--danger-color); }
-    .grade-badge {
-        padding: 6px 14px;
-        border-radius: 8px;
-        font-size: 0.85rem;
-        font-weight: 700;
-        display: inline-block;
-    }
-    .grade-a { background: #e8f5e9; color: #2e7d32; }
-    .grade-b { background: #e3f2fd; color: #1565c0; }
-    .grade-c { background: #fff3e0; color: #ef6c00; }
-    .grade-d { background: #fce4ec; color: #c62828; }
-    .grade-f { background: #ffebee; color: #b71c1c; }
-    .grade-null { background: var(--gray-200); color: var(--gray-500); }
-    .score-bar {
-        width: 60px;
-        height: 6px;
-        background: var(--gray-200);
-        border-radius: 10px;
-        overflow: hidden;
-        display: inline-block;
-        vertical-align: middle;
-        margin-right: 8px;
-    }
-    .score-fill {
-        height: 100%;
-        border-radius: 10px;
-        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
-        transition: width 1s ease;
-    }
-    .attendance-pill {
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        background: var(--primary-soft);
-        color: var(--primary-color);
-    }
-    .action-btns {
+    
+    .action-btn-group {
         display: flex;
         gap: 6px;
+        flex-wrap: wrap;
     }
-    .btn-table {
-        width: 34px;
-        height: 34px;
+    .action-btn-group .btn {
+        padding: 4px 12px;
         border-radius: 8px;
-        border: 1px solid var(--gray-300);
-        background: var(--white);
-        color: var(--text-light);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: var(--transition);
-        text-decoration: none;
-    }
-    .btn-table:hover {
-        background: var(--primary-color);
-        color: var(--white);
-        border-color: var(--primary-color);
-    }
-    .table-footer {
-        padding: 20px;
-        background: var(--gray-100);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .table-info {
-        font-size: 0.85rem;
-        color: var(--text-light);
-    }
-    .pagination {
-        display: flex;
-        gap: 5px;
-    }
-    .page-btn {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        border: 1px solid var(--gray-300);
-        background: var(--white);
-        color: var(--text-dark);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: var(--transition);
-        font-size: 0.85rem;
+        font-size: 0.75rem;
         font-weight: 600;
-        text-decoration: none;
     }
-    .page-btn:hover, .page-btn.active {
-        background: var(--primary-color);
-        color: var(--white);
-        border-color: var(--primary-color);
+    
+    .quick-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
     }
-
-    @media (max-width: 768px) {
-        .students-table-wrap { overflow-x: auto; }
-        .course-header-top { flex-direction: column; }
-        .filter-bar { flex-direction: column; align-items: stretch; }
-        .filter-group { width: 100%; }
-        .filter-input, .filter-select { width: 100%; }
+    .quick-stat {
+        background: var(--white);
+        border-radius: 12px;
+        padding: 15px 20px;
+        box-shadow: var(--shadow-sm);
+        border-left: 4px solid var(--primary-color);
     }
+    .quick-stat .stat-number {
+        font-size: 1.5rem;
+        font-weight: 800;
+    }
+    .quick-stat .stat-label {
+        font-size: 0.75rem;
+        color: var(--text-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .quick-stat.attendance { border-left-color: var(--success-color); }
+    .quick-stat.attendance .stat-number { color: var(--success-color); }
+    .quick-stat.results { border-left-color: var(--primary-color); }
+    .quick-stat.results .stat-number { color: var(--primary-color); }
 </style>
 
-<!-- Course Header -->
-<div class="course-header-hero">
-    <div class="course-header-top">
+<!-- Class Header -->
+<div class="class-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
         <div>
-            <span class="course-code-big"><?php echo htmlspecialchars($course['course_code']); ?></span>
-            <h1 class="course-title-big"><?php echo htmlspecialchars($course['course_title']); ?></h1>
-            <div class="course-meta-row">
-                <div class="course-meta-item">
-                    <i class="fas fa-building"></i>
-                    <?php echo htmlspecialchars($course['department_name'] ?? 'N/A'); ?>
-                </div>
-                <div class="course-meta-item">
-                    <i class="fas fa-layer-group"></i>
-                    Level <?php echo $course['level']; ?>
-                </div>
-                <div class="course-meta-item">
-                    <i class="fas fa-star"></i>
-                    <?php echo $course['credit_units']; ?> Credit Units
-                </div>
-                <div class="course-meta-item">
-                    <i class="fas fa-calendar"></i>
-                    <?php echo $course['session_year']; ?> - Semester <?php echo $course['semester']; ?>
-                </div>
-                <div class="course-meta-item">
-                    <i class="fas fa-users"></i>
-                    <?php echo $total_students; ?> Students
-                </div>
+            <h3><?php echo htmlspecialchars($course['course_title'] ?? 'Class'); ?></h3>
+            <div class="class-meta">
+                <span><i class="fas fa-hashtag"></i> <?php echo htmlspecialchars($course['course_code'] ?? 'N/A'); ?></span>
+                <span><i class="fas fa-star"></i> <?php echo htmlspecialchars($course['credit_units'] ?? 0); ?> Credits</span>
+                <span><i class="fas fa-layer-group"></i> Level <?php echo htmlspecialchars($course['level'] ?? 'N/A'); ?></span>
+                <span><i class="fas fa-calendar"></i> <?php echo htmlspecialchars($course['session_year'] ?? 'N/A'); ?></span>
+                <span><i class="fas fa-clock"></i> Semester <?php echo htmlspecialchars($course['semester'] ?? 1); ?></span>
             </div>
         </div>
-        <div class="course-actions-top">
-            <a href="take_attendance.php?course=<?php echo $course_id; ?>" class="btn-hero btn-hero-primary">
-                <i class="fas fa-clipboard-check"></i>Take Attendance
+        <div>
+            <a href="take_attendance.php?course=<?php echo $course_id; ?>" class="btn btn-light">
+                <i class="fas fa-clipboard-check me-1"></i> Take Attendance
             </a>
-            <a href="upload_results.php?course=<?php echo $course_id; ?>" class="btn-hero btn-hero-outline">
-                <i class="fas fa-upload"></i>Upload Results
+            <a href="results.php?course=<?php echo $course_id; ?>" class="btn btn-light">
+                <i class="fas fa-graduation-cap me-1"></i> Manage Results
             </a>
         </div>
     </div>
 </div>
 
-<!-- Stats Row -->
+<!-- Quick Stats -->
+<div class="quick-stats">
+    <div class="quick-stat attendance">
+        <div class="stat-number"><?php echo $attendance_summary['total_classes'] ?? 0; ?></div>
+        <div class="stat-label">Total Classes</div>
+    </div>
+    <div class="quick-stat attendance">
+        <div class="stat-number"><?php echo $attendance_summary['present_count'] ?? 0; ?></div>
+        <div class="stat-label">Present</div>
+    </div>
+    <div class="quick-stat" style="border-left-color: var(--danger-color);">
+        <div class="stat-number" style="color: var(--danger-color);"><?php echo $attendance_summary['absent_count'] ?? 0; ?></div>
+        <div class="stat-label">Absent</div>
+    </div>
+    <div class="quick-stat results">
+        <div class="stat-number"><?php echo $result_summary['total_results'] ?? 0; ?></div>
+        <div class="stat-label">Results Entered</div>
+    </div>
+    <div class="quick-stat results">
+        <div class="stat-number"><?php echo number_format($result_summary['avg_score'] ?? 0, 1); ?></div>
+        <div class="stat-label">Average Score</div>
+    </div>
+</div>
+
+<!-- Info Cards -->
 <div class="row g-4 mb-4">
     <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon-wrap stat-icon-primary"><i class="fas fa-users"></i></div>
-            </div>
-            <div class="stat-value"><?php echo $total_students; ?></div>
-            <div class="stat-label">Total Students</div>
+        <div class="info-card">
+            <i class="fas fa-users icon"></i>
+            <div class="number"><?php echo count($students); ?></div>
+            <div class="label">Total Students</div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon-wrap stat-icon-success"><i class="fas fa-check-circle"></i></div>
+        <div class="info-card">
+            <i class="fas fa-male icon"></i>
+            <div class="number">
+                <?php 
+                $male = 0;
+                foreach ($students as $s) {
+                    if (($s['gender'] ?? '') == 'Male') $male++;
+                }
+                echo $male;
+                ?>
             </div>
-            <div class="stat-value"><?php echo $present_today; ?></div>
-            <div class="stat-label">Present Today</div>
+            <div class="label">Male Students</div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon-wrap stat-icon-info"><i class="fas fa-chart-line"></i></div>
+        <div class="info-card">
+            <i class="fas fa-female icon"></i>
+            <div class="number">
+                <?php 
+                $female = 0;
+                foreach ($students as $s) {
+                    if (($s['gender'] ?? '') == 'Female') $female++;
+                }
+                echo $female;
+                ?>
             </div>
-            <div class="stat-value"><?php echo $avg_score; ?>%</div>
-            <div class="stat-label">Average Score</div>
+            <div class="label">Female Students</div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon-wrap stat-icon-warning"><i class="fas fa-graduation-cap"></i></div>
+        <div class="info-card">
+            <i class="fas fa-calendar-check icon"></i>
+            <div class="number">
+                <?php 
+                $active = 0;
+                foreach ($students as $s) {
+                    if (($s['registration_status'] ?? '') == 'Approved') $active++;
+                }
+                echo $active;
+                ?>
             </div>
-            <div class="stat-value"><?php echo $graded_count; ?>/<?php echo $total_students; ?></div>
-            <div class="stat-label">Results Uploaded</div>
+            <div class="label">Active Enrollments</div>
         </div>
     </div>
 </div>
 
-<!-- Filter Bar -->
-<div class="filter-bar">
-    <div class="filter-group">
-        <span class="filter-label"><i class="fas fa-search me-1"></i>Search:</span>
-        <input type="text" class="filter-input" id="searchStudent" placeholder="Name or matric number...">
+<!-- Student List -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5><i class="fas fa-user-graduate me-2 text-primary"></i> Student List</h5>
+    <div>
+        <button class="btn btn-outline-custom btn-sm" onclick="window.print()">
+            <i class="fas fa-print me-1"></i> Print
+        </button>
+        <button class="btn btn-outline-custom btn-sm" onclick="exportClassList()">
+            <i class="fas fa-file-export me-1"></i> Export
+        </button>
     </div>
-    <div class="filter-group">
-        <span class="filter-label"><i class="fas fa-filter me-1"></i>Grade:</span>
-        <select class="filter-select" id="filterGrade">
-            <option value="">All Grades</option>
-            <option value="A">A (Excellent)</option>
-            <option value="B">B (Very Good)</option>
-            <option value="C">C (Good)</option>
-            <option value="D">D (Pass)</option>
-            <option value="E">E (Weak Pass)</option>
-            <option value="F">F (Fail)</option>
-            <option value="null">Not Graded</option>
-        </select>
-    </div>
-    <div class="filter-group">
-        <span class="filter-label"><i class="fas fa-venus-mars me-1"></i>Gender:</span>
-        <select class="filter-select" id="filterGender">
-            <option value="">All</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-        </select>
-    </div>
-    <button class="btn-filter" onclick="applyFilters()">
-        <i class="fas fa-filter"></i> Filter
-    </button>
-    <a href="export_class.php?course=<?php echo $course_id; ?>&format=csv" class="btn-export">
-        <i class="fas fa-file-csv"></i> Export CSV
-    </a>
-    <a href="export_class.php?course=<?php echo $course_id; ?>&format=pdf" class="btn-export" style="background: var(--danger-color);">
-        <i class="fas fa-file-pdf"></i> Export PDF
-    </a>
 </div>
 
-<!-- Students Table -->
-<div class="students-table-wrap">
-    <table class="students-table">
+<div class="student-list-table">
+    <table class="table">
         <thead>
             <tr>
+                <th style="width: 50px;">#</th>
                 <th>Student</th>
-                <th>Matric No</th>
+                <th>Matric No.</th>
+                <th>Email</th>
                 <th>Gender</th>
-                <th>Level</th>
-                <th>Attendance</th>
-                <th>CA Score</th>
-                <th>Exam Score</th>
-                <th>Total</th>
-                <th>Grade</th>
+                <th>Enrolled</th>
                 <th>Actions</th>
             </tr>
         </thead>
-        <tbody id="studentsTableBody">
-            <?php foreach ($students as $student): 
-                $grade_class = 'grade-null';
-                if ($student['grade']) {
-                    $grade_class = 'grade-' . strtolower($student['grade']);
-                    if ($student['grade'] == 'A') $grade_class = 'grade-a';
-                    elseif ($student['grade'] == 'B') $grade_class = 'grade-b';
-                    elseif ($student['grade'] == 'C') $grade_class = 'grade-c';
-                    elseif ($student['grade'] == 'D' || $student['grade'] == 'E') $grade_class = 'grade-d';
-                    elseif ($student['grade'] == 'F') $grade_class = 'grade-f';
-                }
-                $total_score = $student['total_score'] ?? 0;
-            ?>
-            <tr data-name="<?php echo strtolower(htmlspecialchars($student['first_name'] . ' ' . $student['last_name'])); ?>"
-                data-matric="<?php echo strtolower(htmlspecialchars($student['matric_number'])); ?>"
-                data-grade="<?php echo $student['grade'] ?? 'null'; ?>"
-                data-gender="<?php echo $student['gender'] ?? ''; ?>">
-                <td>
-                    <div class="student-cell">
-                        <div class="student-table-avatar">
-                            <?php if (!empty($student['profile_image'])): ?>
-                                <img src="<?php echo htmlspecialchars($student['profile_image']); ?>" alt="">
-                            <?php else: ?>
-                                <?php echo strtoupper(substr($student['first_name'], 0, 1) . substr($student['last_name'], 0, 1)); ?>
-                            <?php endif; ?>
-                        </div>
-                        <div>
-                            <div class="student-name">
-                                <?php echo htmlspecialchars($student['last_name'] . ', ' . $student['first_name'] . ' ' . ($student['middle_name'] ?? '')); ?>
+        <tbody>
+            <?php if (count($students) > 0): ?>
+                <?php $counter = 0; foreach ($students as $student): $counter++; ?>
+                <tr>
+                    <td><?php echo $counter; ?></td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="student-avatar-sm">
+                                <?php if (!empty($student['profile_image']) && file_exists('../' . $student['profile_image'])): ?>
+                                    <img src="../<?php echo htmlspecialchars($student['profile_image']); ?>" alt="Student">
+                                <?php else: ?>
+                                    <?php echo strtoupper(substr($student['first_name'], 0, 1)); ?>
+                                <?php endif; ?>
                             </div>
-                            <div class="student-matric"><?php echo htmlspecialchars($student['email']); ?></div>
+                            <div>
+                                <div class="fw-semibold"><?php echo htmlspecialchars($student['first_name'] . ' ' . $student['last_name']); ?></div>
+                                <div class="text-muted" style="font-size: 0.75rem;">ID: <?php echo $student['student_id']; ?></div>
+                            </div>
                         </div>
-                    </div>
-                </td>
-                <td><strong><?php echo htmlspecialchars($student['matric_number']); ?></strong></td>
-                <td>
-                    <span class="badge-status status-active">
-                        <i class="fas fa-<?php echo $student['gender'] == 'Female' ? 'venus' : 'mars'; ?> me-1"></i>
-                        <?php echo htmlspecialchars($student['gender'] ?? 'N/A'); ?>
-                    </span>
-                </td>
-                <td>Level <?php echo $student['current_level']; ?></td>
-                <td>
-                    <span class="attendance-pill">
-                        <i class="fas fa-clock me-1"></i>
-                        <?php echo $student['attendance_percentage'] ?? 0; ?>%
-                    </span>
-                </td>
-                <td>
-                    <span class="score-bar"><span class="score-fill" style="width: <?php echo ($student['ca_score'] ?? 0) * 2; ?>%"></span></span>
-                    <?php echo $student['ca_score'] ?? '-'; ?>
-                </td>
-                <td>
-                    <span class="score-bar"><span class="score-fill" style="width: <?php echo ($student['exam_score'] ?? 0); ?>%"></span></span>
-                    <?php echo $student['exam_score'] ?? '-'; ?>
-                </td>
-                <td><strong><?php echo $total_score > 0 ? $total_score : '-'; ?></strong></td>
-                <td>
-                    <span class="grade-badge <?php echo $grade_class; ?>">
-                        <?php echo $student['grade'] ?? 'N/A'; ?>
-                    </span>
-                </td>
-                <td>
-                    <div class="action-btns">
-                        <a href="student_profile.php?id=<?php echo $student['student_id']; ?>" class="btn-table" title="View Profile">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <a href="upload_results.php?course=<?php echo $course_id; ?>&student=<?php echo $student['student_id']; ?>" class="btn-table" title="Enter Result">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                    </div>
-                </td>
-            </tr>
-            <?php endforeach; ?>
+                    </td>
+                    <td><?php echo htmlspecialchars($student['matric_number']); ?></td>
+                    <td><?php echo htmlspecialchars($student['email']); ?></td>
+                    <td><?php echo htmlspecialchars($student['gender'] ?? 'N/A'); ?></td>
+                    <td style="font-size: 0.8rem;">
+                        <?php echo date('M d, Y', strtotime($student['enrolled_date'] ?? $student['registration_date'])); ?>
+                    </td>
+                    <td>
+                        <div class="action-btn-group">
+                            <a href="student_profile.php?id=<?php echo $student['student_id']; ?>" class="btn btn-primary btn-sm">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="take_attendance.php?course=<?php echo $course_id; ?>&student=<?php echo $student['student_id']; ?>" class="btn btn-success btn-sm">
+                                <i class="fas fa-clipboard-check"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <tr>
+                    <td colspan="7" class="text-center py-4">
+                        <div class="text-muted">
+                            <i class="fas fa-users fa-2x mb-2 d-block"></i>
+                            No students enrolled in this course yet.
+                        </div>
+                    </td>
+                </tr>
+            <?php endif; ?>
         </tbody>
     </table>
-    <div class="table-footer">
-        <div class="table-info">
-            Showing <strong><?php echo $total_students; ?></strong> students 
-            | <strong><?php echo $graded_count; ?></strong> graded 
-            | <strong><?php echo $total_students - $graded_count; ?></strong> pending
-        </div>
-        <div class="pagination">
-            <a href="#" class="page-btn"><i class="fas fa-chevron-left"></i></a>
-            <a href="#" class="page-btn active">1</a>
-            <a href="#" class="page-btn"><i class="fas fa-chevron-right"></i></a>
-        </div>
-    </div>
 </div>
 
 <script>
-    function applyFilters() {
-        const search = document.getElementById('searchStudent').value.toLowerCase();
-        const grade = document.getElementById('filterGrade').value;
-        const gender = document.getElementById('filterGender').value;
-
-        document.querySelectorAll('#studentsTableBody tr').forEach(row => {
-            const name = row.getAttribute('data-name');
-            const matric = row.getAttribute('data-matric');
-            const rowGrade = row.getAttribute('data-grade');
-            const rowGender = row.getAttribute('data-gender');
-
-            let show = true;
-
-            if (search && !name.includes(search) && !matric.includes(search)) show = false;
-            if (grade && rowGrade !== grade) show = false;
-            if (gender && rowGender !== gender) show = false;
-
-            row.style.display = show ? '' : 'none';
-        });
+    function exportClassList() {
+        alert('Export functionality will be implemented here.');
+        // You can implement CSV/Excel export
     }
-
-    document.getElementById('searchStudent').addEventListener('input', applyFilters);
-    document.getElementById('filterGrade').addEventListener('change', applyFilters);
-    document.getElementById('filterGender').addEventListener('change', applyFilters);
-
-    // Animate score bars
-    window.addEventListener('load', () => {
-        document.querySelectorAll('.score-fill').forEach(bar => {
-            const width = bar.style.width;
-            bar.style.width = '0%';
-            setTimeout(() => { bar.style.width = width; }, 300);
-        });
-    });
 </script>
- 
+
+<?php require_once 'includes/footer.php'; ob_end_flush(); ?>
