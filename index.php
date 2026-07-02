@@ -775,7 +775,7 @@
             <div class="portal-avatar"><i class="fas fa-user-cog"></i></div>
             <h3>Admin</h3>
             <p class="role-desc">Oversee operations, reports &amp; settings.</p>
-            <a href="admin/" class="login-btn"><i class="fas fa-sign-in-alt"></i> Admin Login</a>
+            <a href="login.php" class="login-btn"><i class="fas fa-sign-in-alt"></i> Admin Login</a>
         </div> 
     </div>
 </section>
