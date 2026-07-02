@@ -1,0 +1,327 @@
+/* Courses Page Specific Styles */
+
+.courses-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Header */
+.courses-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    border-radius: var(--radius-xl);
+    color: var(--white);
+}
+
+.header-content h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.header-content h1 i {
+    margin-right: 0.5rem;
+}
+
+.header-content p {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+/* Course Stats */
+.course-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.course-stats .stat-card {
+    background: var(--white);
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    text-align: center;
+    transition: all var(--transition-fast);
+}
+
+.course-stats .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Sections */
+.courses-section {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+/* Registration Info */
+.registration-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--gray-50);
+    border-left: 4px solid var(--info);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+}
+
+.registration-info i {
+    font-size: 1.5rem;
+    color: var(--info);
+}
+
+.registration-info p {
+    color: var(--gray-700);
+    font-size: 0.95rem;
+}
+
+/* Tables */
+.courses-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.courses-table th {
+    background: var(--gray-50);
+    padding: 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.courses-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--gray-200);
+    color: var(--gray-600);
+}
+
+.courses-table tbody tr:hover {
+    background: var(--gray-50);
+}
+
+/* Attendance Bar */
+.attendance-bar {
+    width: 100px;
+    height: 6px;
+    background: var(--gray-200);
+    border-radius: var(--radius-full);
+    position: relative;
+    overflow: hidden;
+}
+
+.attendance-progress {
+    height: 100%;
+    background: var(--success);
+    border-radius: var(--radius-full);
+    transition: width var(--transition-normal);
+}
+
+.attendance-bar span {
+    position: absolute;
+    top: -18px;
+    right: 0;
+    font-size: 0.8rem;
+    color: var(--gray-600);
+}
+
+/* Registration Actions */
+.registration-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.selected-count {
+    font-size: 1rem;
+    color: var(--gray-600);
+}
+
+.selected-count span {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 1.25rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Materials Grid */
+.materials-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.material-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.material-card:hover {
+    background: var(--gray-100);
+    transform: translateX(5px);
+}
+
+.material-icon {
+    width: 50px;
+    height: 50px;
+    background: var(--white);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--danger);
+    font-size: 1.5rem;
+}
+
+.material-info {
+    flex: 1;
+}
+
+.material-info h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: var(--gray-800);
+}
+
+.material-info p {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+}
+
+/* Course Details Modal */
+.course-details {
+    padding: 1rem 0;
+}
+
+.course-details h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 1rem;
+}
+
+.course-details .detail-row {
+    display: flex;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.course-details .detail-label {
+    width: 150px;
+    font-weight: 600;
+    color: var(--gray-600);
+}
+
+.course-details .detail-value {
+    flex: 1;
+    color: var(--gray-800);
+}
+
+.course-details .description {
+    margin-top: 1rem;
+    line-height: 1.6;
+    color: var(--gray-700);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .courses-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    
+    .course-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .registration-actions {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .materials-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .course-details .detail-row {
+        flex-direction: column;
+    }
+    
+    .course-details .detail-label {
+        width: 100%;
+        margin-bottom: 0.25rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .courses-header,
+    .course-stats,
+    .registration-actions,
+    .btn {
+        display: none !important;
+    }
+    
+    .courses-section {
+        box-shadow: none;
+        border: 1px solid var(--gray-200);
+        break-inside: avoid;
+    }
+    
+    table {
+        font-size: 12pt;
+    }
+}

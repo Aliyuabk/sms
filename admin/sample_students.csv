@@ -1,0 +1,16 @@
+matric_number,first_name,last_name,email,date_of_birth,gender,middle_name,phone,department_id,program_id,admission_year
+U20/FOC/001,John,Doe,john.doe@university.edu,2000-05-15,Male,,08012345678,1,1,2020
+U20/FOC/002,Jane,Smith,jane.smith@university.edu,2001-02-20,Female,Marie,08023456789,1,2,2020
+U21/FOC/003,Michael,Brown,michael.b@university.edu,2002-07-10,Male,James,08034567890,2,3,2021
+U21/FOC/004,Sarah,Johnson,sarah.j@university.edu,2001-11-30,Female,Elizabeth,08045678901,2,4,2021
+U22/FOC/005,David,Wilson,david.w@university.edu,2003-03-25,Male,Robert,08056789012,1,1,2022
+U22/FOC/006,Emily,Davis,emily.d@university.edu,2002-09-05,Female,Grace,08067890123,3,5,2022
+U20/FOC/007,Robert,Taylor,robert.t@university.edu,2000-12-12,Male,William,08078901234,3,6,2020
+U21/FOC/008,Lisa,Anderson,lisa.a@university.edu,2001-06-18,Female,Anne,08089012345,2,3,2021
+U22/FOC/009,Thomas,Moore,thomas.m@university.edu,2003-01-22,Male,Joseph,08090123456,1,2,2022
+U20/FOC/010,Maria,Garcia,maria.g@university.edu,2000-08-08,Female,Sofia,08001234567,3,5,2020
+U21/FOC/011,James,Martinez,james.m@university.edu,2001-04-14,Male,Daniel,08112345678,2,4,2021
+U22/FOC/012,Sophia,Rodriguez,sophia.r@university.edu,2002-10-31,Female,Isabella,08123456789,1,1,2022
+U20/FOC/013,William,Hernandez,william.h@university.edu,2000-03-07,Male,Charles,08134567890,3,6,2020
+U21/FOC/014,Emma,Lopez,emma.l@university.edu,2001-07-19,Female,Victoria,08145678901,2,3,2021
+U22/FOC/015,Daniel,Gonzalez,daniel.g@university.edu,2003-05-03,Male,Andrew,08156789012,1,2,2022

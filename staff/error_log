@@ -1,0 +1,124 @@
+[01-Jul-2026 00:06:58 Africa/Lagos] Database Connection Error: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+[01-Jul-2026 00:06:58 Africa/Lagos] Global PDO initialization failed: Unable to connect to database. Please try again later.
+[01-Jul-2026 00:12:44 Africa/Lagos] Database Connection Error: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+[01-Jul-2026 00:12:44 Africa/Lagos] Global PDO initialization failed: Unable to connect to database. Please try again later.
+[01-Jul-2026 00:13:13 Africa/Lagos] Database Connection Error: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+[01-Jul-2026 00:13:13 Africa/Lagos] Global PDO initialization failed: Unable to connect to database. Please try again later.
+[01-Jul-2026 00:35:29 Africa/Lagos] Database Connection Error: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+[01-Jul-2026 00:35:29 Africa/Lagos] Global PDO initialization failed: Unable to connect to database. Please try again later.
+[01-Jul-2026 00:36:09 Africa/Lagos] Database Connection Error: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+[01-Jul-2026 00:36:09 Africa/Lagos] Global PDO initialization failed: Unable to connect to database. Please try again later.
+[01-Jul-2026 00:36:09 Africa/Lagos] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/utgoohwm/5geguru.kowagurutech.ng/staff/index.php:9
+Stack trace:
+#0 {main}
+  thrown in /home/utgoohwm/5geguru.kowagurutech.ng/staff/index.php on line 9
+[01-Jul-2026 01:13:32 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:21:20 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:21:36 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 00:23:17 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 2
+[01-Jul-2026 01:23:17 Africa/Lagos] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/utgoohwm/madrasjid.kowagurutech.ng/staff/debug.php:7) in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 7
+[01-Jul-2026 00:25:41 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 2
+[01-Jul-2026 01:25:41 Africa/Lagos] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/utgoohwm/madrasjid.kowagurutech.ng/staff/debug.php:7) in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 7
+[01-Jul-2026 01:25:59 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:27:25 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:27:27 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:29:26 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:29:28 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:31:38 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:32:04 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:32:22 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:32:59 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 00:33:04 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 2
+[01-Jul-2026 01:33:04 Africa/Lagos] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/utgoohwm/madrasjid.kowagurutech.ng/staff/debug.php:7) in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 7
+[01-Jul-2026 01:46:45 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:46:53 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:47:10 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:49:41 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:49:44 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:49:45 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:50:50 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:51:10 Africa/Lagos] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'utgoohwm_sms.staff_dashboard' doesn't exist in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php:14
+Stack trace:
+#0 /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php(14): PDO->prepare('SELECT * FROM s...')
+#1 {main}
+  thrown in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 14
+[01-Jul-2026 01:51:35 Africa/Lagos] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/utgoohwm/madrasjid.kowagurutech.ng/staff/config/database.php:1) in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/index.php on line 47
+[01-Jul-2026 01:51:43 Africa/Lagos] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/utgoohwm/madrasjid.kowagurutech.ng/staff/config/database.php:1) in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/index.php on line 61
+[01-Jul-2026 20:46:59 UTC] PHP Warning:  session_start(): Session cannot be started after headers have already been sent in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 2
+[01-Jul-2026 21:46:59 Africa/Lagos] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/utgoohwm/madrasjid.kowagurutech.ng/staff/debug.php:7) in /home/utgoohwm/madrasjid.kowagurutech.ng/staff/dashboard.php on line 7
