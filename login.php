@@ -136,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | 5G E-GURUSCHOOL</title>
-    <link rel="shortcut icon" href="assets/images/logo.jpeg">
+    <link rel="shortcut icon" href="assets/images/logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -566,7 +566,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_type']) && $_PO
         <div class="login-left">
             <!-- Top curve with logo -->
             <div class="curve-top">
-                <img src="assets/images/logo.jpeg" alt="School Logo" class="school-logo"
+                <img src="assets/images/logo.png" alt="School Logo" class="school-logo"
                      onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22120%22 height=%22120%22><circle cx=%2260%22 cy=%2260%22 r=%2255%22 fill=%22%23c5ea4f%22/><text x=%2260%22 y=%2270%22 text-anchor=%22middle%22 fill=%22%233f749c%22 font-size=%2240%22 font-weight=%22bold%22>5G</text></svg>'">
             </div>
             <div class="school-name">

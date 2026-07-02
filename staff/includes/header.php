@@ -251,6 +251,7 @@ if (!defined('HEADER_INCLUDED')) {
     </style>
 </head>
 <body>
+    <?php include 'preloader.php'; ?>
     <!-- HEADER -->
     <header class="main-header">
         <div class="header-left">
