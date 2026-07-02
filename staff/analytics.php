@@ -42,16 +42,16 @@ $courseStats->execute([$staff_id]);
 $stats = $courseStats->fetch(PDO::FETCH_ASSOC);
 
 // ============================================================
-// 2. ATTENDANCE STATISTICS
+// 2. ATTENDANCE STATISTICS - FIXED ambiguous status
 // ============================================================
 $attStats = $pdo->prepare("
     SELECT 
         COUNT(*) as total_attendance,
-        SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present_count,
-        SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent_count,
-        SUM(CASE WHEN status = 'Late' THEN 1 ELSE 0 END) as late_count,
-        SUM(CASE WHEN status = 'Excused' THEN 1 ELSE 0 END) as excused_count,
-        ROUND(AVG(CASE WHEN status = 'Present' THEN 100 ELSE 0 END), 1) as attendance_rate
+        SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) as present_count,
+        SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END) as absent_count,
+        SUM(CASE WHEN a.status = 'Late' THEN 1 ELSE 0 END) as late_count,
+        SUM(CASE WHEN a.status = 'Excused' THEN 1 ELSE 0 END) as excused_count,
+        ROUND(AVG(CASE WHEN a.status = 'Present' THEN 100 ELSE 0 END), 1) as attendance_rate
     FROM attendance a
     JOIN course_assignments ca ON a.course_id = ca.course_id
     WHERE ca.staff_id = ?
@@ -65,13 +65,13 @@ $attendance = $attStats->fetch(PDO::FETCH_ASSOC);
 $perfStats = $pdo->prepare("
     SELECT 
         COUNT(*) as total_results,
-        AVG(total_score) as avg_score,
-        MIN(total_score) as min_score,
-        MAX(total_score) as max_score,
-        SUM(CASE WHEN grade IN ('A', 'B', 'C') THEN 1 ELSE 0 END) as pass_count,
-        SUM(CASE WHEN grade IN ('D', 'E') THEN 1 ELSE 0 END) as marginal_count,
-        SUM(CASE WHEN grade = 'F' THEN 1 ELSE 0 END) as fail_count,
-        ROUND(AVG(CASE WHEN grade IN ('A', 'B', 'C') THEN 100 ELSE 0 END), 1) as pass_rate
+        AVG(r.total_score) as avg_score,
+        MIN(r.total_score) as min_score,
+        MAX(r.total_score) as max_score,
+        SUM(CASE WHEN r.grade IN ('A', 'B', 'C') THEN 1 ELSE 0 END) as pass_count,
+        SUM(CASE WHEN r.grade IN ('D', 'E') THEN 1 ELSE 0 END) as marginal_count,
+        SUM(CASE WHEN r.grade = 'F' THEN 1 ELSE 0 END) as fail_count,
+        ROUND(AVG(CASE WHEN r.grade IN ('A', 'B', 'C') THEN 100 ELSE 0 END), 1) as pass_rate
     FROM results r
     JOIN course_assignments ca ON r.course_id = ca.course_id
     WHERE ca.staff_id = ? AND r.is_published = 1
@@ -107,7 +107,7 @@ $course_performance = $coursePerf->fetchAll(PDO::FETCH_ASSOC);
 // ============================================================
 $gradeDist = $pdo->prepare("
     SELECT 
-        grade,
+        r.grade,
         COUNT(*) as count,
         ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM results r2 
             JOIN course_assignments ca2 ON r2.course_id = ca2.course_id 
@@ -115,8 +115,8 @@ $gradeDist = $pdo->prepare("
     FROM results r
     JOIN course_assignments ca ON r.course_id = ca.course_id
     WHERE ca.staff_id = ? AND r.is_published = 1
-    GROUP BY grade
-    ORDER BY grade
+    GROUP BY r.grade
+    ORDER BY r.grade
 ");
 $gradeDist->execute([$staff_id, $staff_id]);
 $grade_distribution = $gradeDist->fetchAll(PDO::FETCH_ASSOC);
@@ -126,15 +126,15 @@ $grade_distribution = $gradeDist->fetchAll(PDO::FETCH_ASSOC);
 // ============================================================
 $attTrend = $pdo->prepare("
     SELECT 
-        DATE_FORMAT(class_date, '%Y-%m') as month,
+        DATE_FORMAT(a.class_date, '%Y-%m') as month,
         COUNT(*) as total,
-        SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present,
-        SUM(CASE WHEN status = 'Absent' THEN 1 ELSE 0 END) as absent,
-        ROUND(AVG(CASE WHEN status = 'Present' THEN 100 ELSE 0 END), 1) as rate
+        SUM(CASE WHEN a.status = 'Present' THEN 1 ELSE 0 END) as present,
+        SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END) as absent,
+        ROUND(AVG(CASE WHEN a.status = 'Present' THEN 100 ELSE 0 END), 1) as rate
     FROM attendance a
     JOIN course_assignments ca ON a.course_id = ca.course_id
     WHERE ca.staff_id = ?
-    GROUP BY DATE_FORMAT(class_date, '%Y-%m')
+    GROUP BY DATE_FORMAT(a.class_date, '%Y-%m')
     ORDER BY month DESC
     LIMIT 6
 ");
@@ -530,20 +530,20 @@ require_once 'includes/sidebar.php';
 
     .empty-analytics {
         text-align: center;
-        padding: 60px 20px;
+        padding: 30px 10px;
     }
     .empty-analytics .empty-icon {
-        width: 100px;
-        height: 100px;
+        width: 60px;
+        height: 60px;
         background: var(--primary-soft);
-        border-radius: 24px;
+        border-radius: 16px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
     }
     .empty-analytics .empty-icon i {
-        font-size: 2.5rem;
+        font-size: 1.5rem;
         color: var(--primary-color);
     }
 
@@ -658,7 +658,8 @@ require_once 'includes/sidebar.php';
                     </div>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <div class="empty-analytics" style="padding: 30px 10px;">
+                    <div class="empty-analytics">
+                        <div class="empty-icon"><i class="fas fa-chart-bar"></i></div>
                         <p class="text-muted">No grade data available yet.</p>
                     </div>
                 <?php endif; ?>
@@ -705,7 +706,8 @@ require_once 'includes/sidebar.php';
                     </div>
                 </div>
                 <?php else: ?>
-                    <div class="empty-analytics" style="padding: 30px 10px;">
+                    <div class="empty-analytics">
+                        <div class="empty-icon"><i class="fas fa-venus-mars"></i></div>
                         <p class="text-muted">No gender data available.</p>
                     </div>
                 <?php endif; ?>
@@ -739,7 +741,8 @@ require_once 'includes/sidebar.php';
                     <?php endforeach; ?>
                 </div>
             <?php else: ?>
-                <div class="empty-analytics" style="padding: 30px 10px;">
+                <div class="empty-analytics">
+                    <div class="empty-icon"><i class="fas fa-layer-group"></i></div>
                     <p class="text-muted">No level data available.</p>
                 </div>
             <?php endif; ?>
@@ -757,7 +760,8 @@ require_once 'includes/sidebar.php';
                     <canvas id="attendanceTrendChart"></canvas>
                 </div>
             <?php else: ?>
-                <div class="empty-analytics" style="padding: 30px 10px;">
+                <div class="empty-analytics">
+                    <div class="empty-icon"><i class="fas fa-chart-line"></i></div>
                     <p class="text-muted">No attendance trend data available.</p>
                 </div>
             <?php endif; ?>
@@ -823,7 +827,8 @@ require_once 'includes/sidebar.php';
             </table>
         </div>
     <?php else: ?>
-        <div class="empty-analytics" style="padding: 30px 10px;">
+        <div class="empty-analytics">
+            <div class="empty-icon"><i class="fas fa-trophy"></i></div>
             <p class="text-muted">No course performance data available.</p>
         </div>
     <?php endif; ?>
@@ -879,7 +884,8 @@ require_once 'includes/sidebar.php';
             </table>
         </div>
     <?php else: ?>
-        <div class="empty-analytics" style="padding: 30px 10px;">
+        <div class="empty-analytics">
+            <div class="empty-icon"><i class="fas fa-star"></i></div>
             <p class="text-muted">No student performance data available.</p>
         </div>
     <?php endif; ?>
