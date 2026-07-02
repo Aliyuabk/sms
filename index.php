@@ -133,8 +133,8 @@ try {
         }
 
         .logo-icon {
-            width: 48px;
-            height: 48px;
+            width: 58px;
+            height: 58px;
             background: linear-gradient(145deg, var(--primary), var(--primary-light));
             border-radius: 16px;
             display: flex;
