@@ -1,6 +1,6 @@
         <footer class="footer">
             <p>&copy; <?php echo date('Y'); ?> Madarasatu Masjib Ibn Abbas . All rights reserved. V.1.0 <br>
-            <!-- Designed by <a class="app-link" href="https://kowagurutech.ng" target="_blank">Kowaguru Tech LTD</a></p> -->
+            Designed by <a class="app-link" href="https://freemanicthub.com.ng/" target="_blank">FreeMan ICT Hub</a></p>
         </footer>
     </main>
     <?php if(isset($_SESSION['student_id'])): ?>

@@ -736,6 +736,7 @@ try {
     </style>
 </head>
 <body>
+    
 <?php include 'preloader.php';?>
 <!-- HEADER -->
 <header class="header" id="header">
@@ -984,6 +985,7 @@ try {
     </div>
     <div class="footer-bottom">
         <span>&copy; <?php echo date('Y'); ?> Madrasatu Masjid Abdullahi Ibnu Abbas. All rights reserved.</span>
+        <small>Designed and Developed by <a href="https://freemanicthub.com.ng/" target="_blank">FreeMan ICT Hub</a></small>
         <div class="contact-info">
             <span><i class="fas fa-phone"></i> 09037814903</span>
             <span><i class="fas fa-phone"></i> 07036135512</span>
